@@ -9,7 +9,7 @@ Edge = namedtuple('Edge', ['source', 'dest', 'arg_num_at_dest'])
 # Returns:
 #	V: list of Vertices
 #	E: list of Edges (n.b. 'constant' is a placeholder for a constant, not a
-#      vertex named 'constant')
+#      vertex named 'constant', same for 'argument')
 def graph_from_json(fn):
 	instructions = {}
 	with open(fn, 'r') as f:
@@ -22,10 +22,12 @@ def graph_from_json(fn):
 		if not instruction['operands']:
 			continue
 		for i, operand in enumerate(instruction['operands']):
-			if operand['instr_or_constant'] == 'instruction':
+			if operand['description'] == 'instruction':
 				E.append(Edge(operand['value'], instruction_ptr, i))
-			elif operand['instr_or_constant'] == 'constant':
+			elif operand['description'] == 'constant':
 				E.append(Edge('constant', instruction_ptr, i))
+			elif operand['description'] == 'argument':
+				E.append(Edge('argument', instruction_ptr, i))
 	return V, E
 
 def print_graph(V, E):
