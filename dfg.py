@@ -14,11 +14,11 @@ def graph_from_json(fn):
 	instructions = {}
 	with open(fn, 'r') as f:
 		instructions = json.load(f)
-	V = []
+	V = set()
 	E = []
 	for instruction in instructions:
 		instruction_ptr = instruction['pointer']
-		V.append(Vertex(instruction_ptr, instruction['opcode']))
+		V.add((Vertex(instruction_ptr, instruction['opcode'])))
 		if not instruction['operands']:
 			continue
 		for i, operand in enumerate(instruction['operands']):
@@ -27,7 +27,8 @@ def graph_from_json(fn):
 			elif operand['description'] == 'constant':
 				E.append(Edge('constant', instruction_ptr, i))
 			elif operand['description'] == 'argument':
-				E.append(Edge('argument', instruction_ptr, i))
+				V.add((Vertex(operand['value'], 'argument')))
+				E.append(Edge(operand['value'], instruction_ptr, i))
 	return V, E
 
 def print_graph(V, E):
