@@ -55,6 +55,13 @@ namespace {
       return InstrPtrStream.str();
     }
 
+    std::string stringifyPtr(Argument &A) {
+      std::string InstrPtrString;
+      raw_string_ostream InstrPtrStream(InstrPtrString);
+      InstrPtrStream << &A;
+      return InstrPtrStream.str();
+    }
+
     std::string stringifyType(Type *T) {
       std::string TypeString;
       raw_string_ostream TypeStream(TypeString);
@@ -75,22 +82,26 @@ namespace {
 
           for (auto &Op : I.operands()) {
             json OpJson;
-            // only record the operand if it is a constant int
+            // only record the operand if it is a constant int, function argument,
             // or the destination of a previous instruction
             if (llvm::ConstantInt* OpConstant = dyn_cast<llvm::ConstantInt>(Op)) {
-              OpJson["instr_or_constant"] = "constant";
+              OpJson["description"] = "constant";
               OpJson["type"] = stringifyType(Op->getType());
               OpJson["value"] = OpConstant->getValue().getSExtValue();
             // // Floating point is untested:
             // } else if (llvm::ConstantFP* OpFloat = dyn_cast<llvm::ConstantFP>(Op)) {
             //   errs() << "Constant\n";
-            //   OpJson["instr_or_constant"] = "constant";
+            //   OpJson["description"] = "constant";
             //   OpJson["type"] = stringifyType(Op->getType());
             //   OpJson["value"] = OpFloat->getValueAPF().convertToFloat();
             } else if (llvm::Instruction* OpInstruction = dyn_cast<llvm::Instruction>(Op)) {
-              OpJson["instr_or_constant"] = "instruction";
+              OpJson["description"] = "instruction";
               OpJson["type"] = stringifyType(Op->getType());
               OpJson["value"] = stringifyPtr(*OpInstruction);
+            } else if (llvm::Argument* OpArgument = dyn_cast<llvm::Argument>(Op)) {
+              OpJson["description"] = "argument";
+              OpJson["type"] = stringifyType(Op->getType());
+              OpJson["value"] = stringifyPtr(*OpArgument);
             }
 
             if (OpJson != nullptr) {
