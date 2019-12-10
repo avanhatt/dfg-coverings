@@ -47,6 +47,17 @@ def visualize_graph(V, E):
 		dot.edge(edge.source, edge.dest, constraint='false')
 	dot.render('output.gv', view=True)
 
+
+""" G1 is a subgraph of G2
+	- instruction nodes should be the same if they have the same opcode and
+	  number of args
+	- constants and arguments can always be considered the same
+"""
+def is_subgraph(G1, G2):
+	(V1, E1), (V2, E2) = G1, G2
+
+	return False
+
 def main():
 	parser = argparse.ArgumentParser()
 	parser.add_argument('--input', type=str, required=True)
@@ -54,6 +65,7 @@ def main():
 	V, E = graph_from_json(args.input)
 	print_graph(V, E)
 	visualize_graph(V, E)
+	is_subgraph((V, E), (V, E))
 
 if __name__ == '__main__':
 	main()
