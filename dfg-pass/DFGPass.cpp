@@ -48,18 +48,11 @@ namespace {
       return InstrStream.str();
     }
 
-    std::string stringifyPtr(Instruction &I) {
-      std::string InstrPtrString;
-      raw_string_ostream InstrPtrStream(InstrPtrString);
-      InstrPtrStream << &I;
-      return InstrPtrStream.str();
-    }
-
-    std::string stringifyPtr(Argument &A) {
-      std::string InstrPtrString;
-      raw_string_ostream InstrPtrStream(InstrPtrString);
-      InstrPtrStream << &A;
-      return InstrPtrStream.str();
+    std::string stringifyPtr(Value &V) {
+      std::string PtrString;
+      raw_string_ostream PtrStream(PtrString);
+      PtrStream << &V;
+      return PtrStream.str();
     }
 
     std::string stringifyType(Type *T) {
