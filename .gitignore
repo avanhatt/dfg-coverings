@@ -3,6 +3,10 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+# Graphviz
+*.gv
+*.gv.pdf
+
 # C extensions
 *.so
 

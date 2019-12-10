@@ -5,8 +5,8 @@ pass:
 	cd $(BUILD_DIR); make; cd $(TOP_DIR)
 
 clean:
-	rm -f ./tests/*.ll
-	rm -f ./tests/*.json
+	rm -f {./tests/*,./tests/*/*}.{ll,json}
+	rm -f *.gv *.gv.pdf
 
 %.ll: %.c pass
 	clang $(CFLAGS) -emit-llvm -Xclang -disable-O0-optnone -S $< -o $@
