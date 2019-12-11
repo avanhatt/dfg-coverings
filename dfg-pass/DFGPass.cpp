@@ -26,6 +26,14 @@ namespace {
     cl::init("info.json") // Default value
   );
 
+    // -blocks is a command line argument to opt
+  static cl::opt<bool> PerBasicBlock(
+    "blocks", // Name of command line arg
+    cl::desc("Specify whether to output subgraphs per basic block"), // -help
+    // text
+    cl::init(true) // Default value
+  );
+
   struct DFGPass : public FunctionPass {
     static char ID;
     json DestinationToOperands;
@@ -41,11 +49,11 @@ namespace {
     void getAnalysisUsage(AnalysisUsage &AU) const {
     }
 
-    std::string stringifyText(Instruction &I) {
-      std::string InstrString;
-      raw_string_ostream InstrStream(InstrString);
-      InstrStream << I;
-      return InstrStream.str();
+    std::string stringifyValue(Value &V) {
+      std::string ValueString;
+      raw_string_ostream ValueStream(ValueString);
+      ValueStream << V;
+      return ValueStream.str();
     }
 
     std::string stringifyPtr(Value &V) {
@@ -63,12 +71,13 @@ namespace {
     }
 
     virtual bool runOnFunction(Function &F) {
+      int blockI = 0;
       for (auto &B : F) {
         for (auto &I : B) {
           // add instruction (identified by pointer) to the json
           json InstrJson;
           InstrJson["pointer"] = stringifyPtr(I);
-          InstrJson["text"] = stringifyText(I);
+          InstrJson["text"] = stringifyValue(I);
           InstrJson["opcode"] = I.getOpcodeName();
           InstrJson["type"] = stringifyType(I.getType());
           InstrJson["operands"] = {};
@@ -87,19 +96,30 @@ namespace {
             //   OpJson["description"] = "constant";
             //   OpJson["type"] = stringifyType(Op->getType());
             //   OpJson["value"] = OpFloat->getValueAPF().convertToFloat();
-            } else if (llvm::Instruction* OpInstruction = dyn_cast<llvm::Instruction>(Op)) {
-              OpJson["description"] = "instruction";
-              OpJson["type"] = stringifyType(Op->getType());
-              OpJson["value"] = stringifyPtr(*OpInstruction);
             } else if (llvm::Argument* OpArgument = dyn_cast<llvm::Argument>(Op)) {
               OpJson["description"] = "argument";
               OpJson["type"] = stringifyType(Op->getType());
               OpJson["value"] = stringifyPtr(*OpArgument);
+            } else if (llvm::Instruction* OpInstruction = dyn_cast<llvm::Instruction> (Op)) {
+              // If in basic block mode, handle instructions from different
+              // blocks
+              if (PerBasicBlock && (OpInstruction->getParent() != I.getParent())) {
+                errs() << "Different parents " << *OpInstruction << I << "\n";
+                OpJson["description"] = "instruction-external";
+                OpJson["type"] = stringifyType(Op->getType());
+                OpJson["value"] = stringifyPtr(*OpInstruction);
+              } else {
+                OpJson["description"] = "instruction";
+                OpJson["type"] = stringifyType(Op->getType());
+                OpJson["value"] = stringifyPtr(*OpInstruction);
+              }
+
+            } else {
+              errs() << "Unhandled operand: " << *Op << "\n";
+              continue;
             }
 
-            if (OpJson != nullptr) {
-              (InstrJson["operands"]).push_back(OpJson);
-            }
+            (InstrJson["operands"]).push_back(OpJson);
           }
           DestinationToOperands.push_back(InstrJson);
         }

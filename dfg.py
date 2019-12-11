@@ -8,7 +8,7 @@ Edge = namedtuple('Edge', ['source', 'dest', 'arg_num_at_dest'])
 
 # Returns:
 #	V: list of Vertices
-#	E: list of Edges 
+#	E: list of Edges
 #   (n.b. 'constant' is a placeholder for a constant, not a
 #    vertex named 'constant', same for 'argument')
 def graph_from_json(fn):
@@ -17,8 +17,9 @@ def graph_from_json(fn):
 		instructions = json.load(f)
 	V = set()
 	E = []
-	# all constants are unique for now
+	# all constants and "external" nodes are unique for now
 	const_num = 0
+	ext_num = 0
 	for instruction in instructions:
 		instruction_ptr = instruction['pointer']
 		V.add((Vertex(instruction_ptr, instruction['opcode'])))
@@ -27,6 +28,11 @@ def graph_from_json(fn):
 		for i, operand in enumerate(instruction['operands']):
 			if operand['description'] == 'instruction':
 				E.append(Edge(operand['value'], instruction_ptr, i))
+			elif operand['description'] == 'instruction-external':
+				external_name = 'external_%d' % ext_num
+				V.add((Vertex(external_name, external_name)))
+				E.append(Edge(external_name, instruction_ptr, i))
+				ext_num += 1
 			elif operand['description'] == 'constant':
 				constant_name = 'constant_%d' % const_num
 				V.add((Vertex(constant_name, constant_name)))
@@ -47,10 +53,11 @@ def print_graph(V, E):
 
 def visualize_graph(V, E):
 	dot = Digraph()
+	# dot.attr(rankdir='LR')
 	for vertex in V:
 		dot.node(vertex.pointer, vertex.opcode)
 	for edge in E:
-		dot.edge(edge.source, edge.dest, constraint='false')
+		dot.edge(edge.source, edge.dest)
 	dot.render('output.gv', view=True)
 
 
@@ -69,7 +76,7 @@ def main():
 	parser.add_argument('--input', type=str, required=True)
 	args = parser.parse_args();
 	V, E = graph_from_json(args.input)
-	print_graph(V, E)
+	# print_graph(V, E)
 	visualize_graph(V, E)
 	is_subgraph((V, E), (V, E))
 
