@@ -111,9 +111,8 @@ namespace {
                 OpJson["type"] = stringifyType(Op->getType());
                 OpJson["value"] = stringifyPtr(*OpInstruction);
               }
-
             } else {
-              errs() << "Unhandled operand: " << *Op << "\n";
+              errs() << "Unhandled operand of type: " << stringifyType(Op->getType()) << "\n";
               continue;
             }
 

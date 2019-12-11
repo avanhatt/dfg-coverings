@@ -7,6 +7,10 @@ __pycache__/
 *.gv
 *.gv.pdf
 
+# Clang outputs
+*.ll
+*.ll.json
+
 # C extensions
 *.so
 
