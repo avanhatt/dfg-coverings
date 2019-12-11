@@ -84,18 +84,16 @@ namespace {
 
           for (auto &Op : I.operands()) {
             json OpJson;
-            // only record the operand if it is a constant int, function argument,
-            // or the destination of a previous instruction
+            // only record the operand if it is a constant int, constant float,
+            // function argument, or the destination of a previous instruction
             if (llvm::ConstantInt* OpConstant = dyn_cast<llvm::ConstantInt>(Op)) {
               OpJson["description"] = "constant";
               OpJson["type"] = stringifyType(Op->getType());
               OpJson["value"] = OpConstant->getValue().getSExtValue();
-            // // Floating point is untested:
-            // } else if (llvm::ConstantFP* OpFloat = dyn_cast<llvm::ConstantFP>(Op)) {
-            //   errs() << "Constant\n";
-            //   OpJson["description"] = "constant";
-            //   OpJson["type"] = stringifyType(Op->getType());
-            //   OpJson["value"] = OpFloat->getValueAPF().convertToFloat();
+            } else if (llvm::ConstantFP* OpFloat = dyn_cast<llvm::ConstantFP>(Op)) {
+              OpJson["description"] = "constant";
+              OpJson["type"] = stringifyType(Op->getType());
+              OpJson["value"] = OpFloat->getValueAPF().convertToDouble();
             } else if (llvm::Argument* OpArgument = dyn_cast<llvm::Argument>(Op)) {
               OpJson["description"] = "argument";
               OpJson["type"] = stringifyType(Op->getType());
