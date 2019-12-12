@@ -99,7 +99,7 @@ namespace {
 
     json jsonPerOperand(Value *Op, Instruction &I) {
       json OpJson;
-      if (Instruction *OpInstruction = dyn_cast<Instruction> (Op)) {
+      if (Instruction *OpInstruction = dyn_cast<Instruction>(Op)) {
         // If in basic block mode, handle instructions from different
         // blocks and from Phi nodes
         if (PerBasicBlock && (OpInstruction->getParent() != I.getParent()
@@ -136,7 +136,8 @@ namespace {
           errs() << "Skipping UndefValue\n";
         }
       } else {
-        errs() << "Unhandled operand of type: " << stringifyType(Op->getType()) << "\n";
+        errs() << "Unhandled operand of type: " << stringifyType(Op->getType())
+          << "\n";
         // errs() << *Op << "\n";
       }
       return OpJson;
@@ -150,7 +151,7 @@ namespace {
           // Skip instructions without dependencies or side effects
           if (skipInstruction(I)) continue;
 
-          // add instruction (identified by pointer) to the json
+          // Add instruction (identified by pointer) to the json
           json InstrJson;
           InstrJson["pointer"] = stringifyPtr(I);
           InstrJson["text"] = stringifyValue(I);
@@ -158,6 +159,7 @@ namespace {
           InstrJson["type"] = stringifyType(I.getType());
           InstrJson["operands"] = {};
 
+          // Add incoming edges from operands where applicable
           for (auto &Op : I.operands()) {
             if (skipOperand(Op)) continue;
 
@@ -166,6 +168,29 @@ namespace {
               (InstrJson["operands"]).push_back(OpJson);
             }
           }
+
+          // Add special out edges if the result of this instruction is returned
+          // or used outside of this block
+          for (auto *U : I.users()) {
+            if (Instruction *UInst = dyn_cast<Instruction>(U)) {
+              // If the use is not in the same basic block, consider it an out
+              // edge
+              if (UInst->getParent() != &B) {
+                errs() << "out?\n";
+                json OutJson;
+                OutJson["pointer"] = stringifyPtr(*UInst);
+                OutJson["description"] = "out";
+                OutJson["type"] = stringifyType(UInst->getType());
+                OutJson["value"] = stringifyPtr(I);
+                DestinationToOperands.push_back(OutJson);
+              } else {
+                errs() << "same parents?" << *UInst << I << "\n";
+              }
+            } else {
+              errs () << "Non-instruction use: " << *U << "\n";
+            }
+          }
+
           DestinationToOperands.push_back(InstrJson);
         }
       }

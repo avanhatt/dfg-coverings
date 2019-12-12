@@ -17,12 +17,23 @@ def graph_from_json(fn):
 		instructions = json.load(f)
 	V = set()
 	E = []
-	# all constants and "external" nodes are unique for now
+	# all constants, "external", and "out" nodes are unique for now
+	# TODO: abstract this away better
 	const_num = 0
 	ext_num = 0
+	out_num = 0
 	for instruction in instructions:
+		# Special case out nodes
+		if 'description' in instruction and instruction['description'] == 'out':
+			out_name = 'out%d' % out_num
+			V.add((Vertex(out_name, out_name)))
+			E.append(Edge(instruction['value'], out_name, 0))
+			out_num += 1
+			continue
+
 		instruction_ptr = instruction['pointer']
 		V.add((Vertex(instruction_ptr, instruction['opcode'])))
+
 		if not instruction['operands']:
 			continue
 		for i, operand in enumerate(instruction['operands']):
@@ -62,6 +73,17 @@ def visualize_graph(V, E):
 	dot = Digraph()
 	# dot.attr(rankdir='LR')
 	for vertex in V:
+		# Hacky, should fix at some point
+		if "out" in vertex.opcode:
+			dot.attr('node', shape='diamond', style='filled', color='pink')
+		elif "external" in vertex.opcode or "argument" in vertex.opcode:
+			dot.attr('node', shape='diamond', style='filled',
+				color='lightgreen')
+		elif "constant" in vertex.opcode:
+			dot.attr('node', shape='diamond', style='filled',
+				color='lightblue')
+		else:
+			dot.attr('node', shape='oval', style='solid', color='black')
 		dot.node(vertex.pointer, vertex.opcode)
 	for edge in E:
 		dot.edge(edge.source, edge.dest)
