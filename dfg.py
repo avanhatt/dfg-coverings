@@ -22,12 +22,23 @@ def graph_from_json(fn):
 		instructions = json.load(f)
 	V = set()
 	E = []
-	# all constants and "external" nodes are unique for now
+	# all constants, "external", and "out" nodes are unique for now
+	# TODO: abstract this away better
 	const_num = 0
 	ext_num = 0
+	out_num = 0
 	for instruction in instructions:
+		# Special case out nodes
+		if 'description' in instruction and instruction['description'] == 'out':
+			out_name = 'out_%d' % out_num
+			V.add((Vertex(out_name, out_name)))
+			E.append(Edge(instruction['value'], out_name, 0))
+			out_num += 1
+			continue
+
 		instruction_ptr = instruction['pointer']
 		V.add((Vertex(instruction_ptr, instruction['opcode'])))
+
 		if not instruction['operands']:
 			continue
 		for i, operand in enumerate(instruction['operands']):
@@ -92,20 +103,27 @@ def print_graph(G):
 
 def visualize_graph(G):
 	dot = Digraph()
-
 	if type(G) is nx.DiGraph:
-		for v,dat in G.nodes(data=True):
-			dot.node(v, dat['opcode'])
-		for e in G.edges:
-			dot.edge(*e);
-	else:
-		V,E = G
-		dot = Digraph()
-		# dot.attr(rankdir='LR')
-		for vertex in V:
-			dot.node(vertex.pointer, vertex.opcode)
-		for edge in E:
-			dot.edge(edge.source, edge.dest)
+		node_gen = ((v, dat['opcode']) for v,dat in G.nodes(data=True))
+		edge_gen = G.edges
+	elif type(G) is tuple:
+		node_gen, edge_gen = G
+
+	for n in node_gen:
+		vertex = Vertex(*n)
+		# Hacky, should fix at some point
+		if "out" in vertex.opcode or "ret" in vertex.opcode:
+			dot.attr('node', shape='diamond', style='filled', color='pink')
+		elif "external" in vertex.opcode or "argument" in vertex.opcode:
+			dot.attr('node', shape='diamond', style='filled',
+				color='lightgreen')
+		elif "constant" in vertex.opcode:
+			dot.attr('node', shape='diamond', style='filled',
+				color='lightblue')
+		else:
+			dot.attr('node', shape='oval', style='solid', color='black')
+	for e in edge_gen:
+		dot.edge(*e)
 
 	try:
 		dot.render('output.gv', view=True)
