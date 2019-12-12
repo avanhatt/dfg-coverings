@@ -71,7 +71,7 @@ namespace {
     }
 
     bool skipInstruction(Instruction &I) {
-      // Skip unreachable, and side-effect-free branches and returns
+      // Skip unreachable
       if (isa<UnreachableInst>(I)) return true;
 
       // Skip unconditional voids
@@ -87,6 +87,13 @@ namespace {
       return false;
     }
 
+    bool skipOperand(Value *Op) {
+      // Skip labels (which can be operands to branch instructions)
+      if (isa<BasicBlock>(Op)) return true;
+
+      return false;
+    }
+
     virtual bool runOnFunction(Function &F) {
       int blockI = 0;
       for (auto &B : F) {
@@ -94,6 +101,7 @@ namespace {
 
           // Skip instructions without dependencies or side effects
           if (skipInstruction(I)) continue;
+
           // add instruction (identified by pointer) to the json
           json InstrJson;
           InstrJson["pointer"] = stringifyPtr(I);
@@ -103,6 +111,8 @@ namespace {
           InstrJson["operands"] = {};
 
           for (auto &Op : I.operands()) {
+            if (skipOperand(Op)) continue;
+
             json OpJson;
             // only record the operand if it is a constant int, constant float,
             // function argument, or the destination of a previous instruction
@@ -134,6 +144,7 @@ namespace {
               }
             } else {
               errs() << "Unhandled operand of type: " << stringifyType(Op->getType()) << "\n";
+              // errs() << *Op << "\n";
               continue;
             }
 
