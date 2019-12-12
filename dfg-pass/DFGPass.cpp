@@ -84,6 +84,9 @@ namespace {
         if (Ret->getNumOperands() == 0) return true;
       }
 
+      // For now, skip Phi nodes
+      if (isa<PHINode>(I)) return true;
+
       return false;
     }
 
@@ -116,9 +119,10 @@ namespace {
             json OpJson;
             if (Instruction *OpInstruction = dyn_cast<Instruction> (Op)) {
               // If in basic block mode, handle instructions from different
-              // blocks
-              if (PerBasicBlock && (OpInstruction->getParent() != I.getParent())) {
-                errs() << "Different parents " << *OpInstruction << I << "\n";
+              // blocks and from Phi nodes
+              if (PerBasicBlock && (OpInstruction->getParent() != I.getParent()
+                || isa<PHINode>(Op))) {
+                //errs() << "Different parents " << *OpInstruction << I << "\n";
                 OpJson["description"] = "instruction-external";
                 OpJson["type"] = stringifyType(Op->getType());
                 OpJson["value"] = stringifyPtr(*OpInstruction);
