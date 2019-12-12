@@ -111,6 +111,7 @@ def visualize_graph(G):
 
 	for n in node_gen:
 		vertex = Vertex(*n)
+		print(n, vertex)
 		# Hacky, should fix at some point
 		if "out" in vertex.opcode or "ret" in vertex.opcode:
 			dot.attr('node', shape='diamond', style='filled', color='pink')
@@ -122,6 +123,7 @@ def visualize_graph(G):
 				color='lightblue')
 		else:
 			dot.attr('node', shape='oval', style='solid', color='black')
+		dot.node(vertex.pointer, vertex.opcode)
 	for e in edge_gen:
 		dot.edge(*e)
 
