@@ -70,10 +70,30 @@ namespace {
       return TypeStream.str();
     }
 
+    bool skipInstruction(Instruction &I) {
+      // Skip unreachable, and side-effect-free branches and returns
+      if (isa<UnreachableInst>(I)) return true;
+
+      // Skip unconditional voids
+      if (BranchInst *Br = dyn_cast<BranchInst>(&I)) {
+        if (Br->isUnconditional()) return true;
+      }
+
+      // Skip void returns
+      if (ReturnInst *Ret = dyn_cast<ReturnInst>(&I)) {
+        if (Ret->getNumOperands() == 0) return true;
+      }
+
+      return false;
+    }
+
     virtual bool runOnFunction(Function &F) {
       int blockI = 0;
       for (auto &B : F) {
         for (auto &I : B) {
+
+          // Skip instructions without dependencies or side effects
+          if (skipInstruction(I)) continue;
           // add instruction (identified by pointer) to the json
           json InstrJson;
           InstrJson["pointer"] = stringifyPtr(I);
@@ -86,20 +106,20 @@ namespace {
             json OpJson;
             // only record the operand if it is a constant int, constant float,
             // function argument, or the destination of a previous instruction
-            if (llvm::ConstantInt* OpConstant = dyn_cast<llvm::ConstantInt>(Op)) {
+            if (ConstantInt *OpConstant = dyn_cast<ConstantInt>(Op)) {
               OpJson["description"] = "constant";
               OpJson["type"] = stringifyType(Op->getType());
               OpJson["value"] = OpConstant->getValue().getSExtValue();
-            } else if (llvm::ConstantFP* OpFloat = dyn_cast<llvm::ConstantFP>(Op)) {
+            } else if (ConstantFP *OpFloat = dyn_cast<ConstantFP>(Op)) {
               OpJson["description"] = "constant";
               OpJson["type"] = stringifyType(Op->getType());
               OpJson["value"] = OpFloat->getValueAPF().convertToDouble();
-            } else if (llvm::Argument* OpArgument = dyn_cast<llvm::Argument>(Op)) {
+            } else if (Argument *OpArgument = dyn_cast<Argument>(Op)) {
               OpJson["description"] = "argument";
               OpJson["type"] = stringifyType(Op->getType());
               OpJson["value"] = stringifyPtr(*OpArgument);
               OpJson["argument_number_in_function"] = OpArgument->getArgNo();
-            } else if (llvm::Instruction* OpInstruction = dyn_cast<llvm::Instruction> (Op)) {
+            } else if (Instruction *OpInstruction = dyn_cast<Instruction> (Op)) {
               // If in basic block mode, handle instructions from different
               // blocks
               if (PerBasicBlock && (OpInstruction->getParent() != I.getParent())) {
