@@ -25,7 +25,7 @@ def graph_from_json(fn):
 	for instruction in instructions:
 		# Special case out nodes
 		if 'description' in instruction and instruction['description'] == 'out':
-			out_name = 'out%d' % out_num
+			out_name = 'out_%d' % out_num
 			V.add((Vertex(out_name, out_name)))
 			E.append(Edge(instruction['value'], out_name, 0))
 			out_num += 1
@@ -74,7 +74,7 @@ def visualize_graph(V, E):
 	# dot.attr(rankdir='LR')
 	for vertex in V:
 		# Hacky, should fix at some point
-		if "out" in vertex.opcode:
+		if "out" in vertex.opcode or "ret" in vertex.opcode:
 			dot.attr('node', shape='diamond', style='filled', color='pink')
 		elif "external" in vertex.opcode or "argument" in vertex.opcode:
 			dot.attr('node', shape='diamond', style='filled',
