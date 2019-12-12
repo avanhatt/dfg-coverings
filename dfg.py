@@ -101,6 +101,11 @@ def print_graph(G):
 	else:
 		print("Graph format not recognized")
 
+
+def has_side_effects(opcode):
+	opcodes = ["ret", "br", "call", "out", "store"]
+	return any([o in opcode for o in opcodes])
+
 def visualize_graph(G):
 	dot = Digraph()
 	if type(G) is nx.DiGraph:
@@ -113,7 +118,7 @@ def visualize_graph(G):
 		vertex = Vertex(*n)
 		print(n, vertex)
 		# Hacky, should fix at some point
-		if "out" in vertex.opcode or "ret" in vertex.opcode:
+		if has_side_effects(vertex.opcode):
 			dot.attr('node', shape='diamond', style='filled', color='pink')
 		elif "external" in vertex.opcode or "argument" in vertex.opcode:
 			dot.attr('node', shape='diamond', style='filled',
