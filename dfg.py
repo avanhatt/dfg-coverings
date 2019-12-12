@@ -41,6 +41,13 @@ def graph_from_json(fn):
 			elif operand['description'] == 'argument':
 				V.add((Vertex(operand['value'], 'argument_%d' % operand['argument_number_in_function'])))
 				E.append(Edge(operand['value'], instruction_ptr, i))
+			elif operand['description'] == 'pointer':
+				# some pointers point to existing instructions that
+				# have already been added as vertices
+				# others appear to point to external functions
+				# and need to be added now
+				V.add((Vertex(operand['value'], 'pointer')))
+				E.append(Edge(operand['value'], instruction_ptr, i))
 	return V, E
 
 def print_graph(V, E):

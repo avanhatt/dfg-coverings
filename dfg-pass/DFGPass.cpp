@@ -114,9 +114,20 @@ namespace {
             if (skipOperand(Op)) continue;
 
             json OpJson;
-            // only record the operand if it is a constant int, constant float,
-            // function argument, or the destination of a previous instruction
-            if (ConstantInt *OpConstant = dyn_cast<ConstantInt>(Op)) {
+            if (Instruction *OpInstruction = dyn_cast<Instruction> (Op)) {
+              // If in basic block mode, handle instructions from different
+              // blocks
+              if (PerBasicBlock && (OpInstruction->getParent() != I.getParent())) {
+                errs() << "Different parents " << *OpInstruction << I << "\n";
+                OpJson["description"] = "instruction-external";
+                OpJson["type"] = stringifyType(Op->getType());
+                OpJson["value"] = stringifyPtr(*OpInstruction);
+              } else {
+                OpJson["description"] = "instruction";
+                OpJson["type"] = stringifyType(Op->getType());
+                OpJson["value"] = stringifyPtr(*OpInstruction);
+              }
+            } else if (ConstantInt *OpConstant = dyn_cast<ConstantInt>(Op)) {
               OpJson["description"] = "constant";
               OpJson["type"] = stringifyType(Op->getType());
               OpJson["value"] = OpConstant->getValue().getSExtValue();
@@ -129,18 +140,15 @@ namespace {
               OpJson["type"] = stringifyType(Op->getType());
               OpJson["value"] = stringifyPtr(*OpArgument);
               OpJson["argument_number_in_function"] = OpArgument->getArgNo();
-            } else if (Instruction *OpInstruction = dyn_cast<Instruction> (Op)) {
-              // If in basic block mode, handle instructions from different
-              // blocks
-              if (PerBasicBlock && (OpInstruction->getParent() != I.getParent())) {
-                errs() << "Different parents " << *OpInstruction << I << "\n";
-                OpJson["description"] = "instruction-external";
+            } else if (DerivedUser *OpDerivedUser = dyn_cast<DerivedUser>(Op)) {
+              // all pointer operands seem to be of DerivedUser type
+              if (PointerType *t = dyn_cast<PointerType>(Op->getType())) {
+                OpJson["description"] = "pointer";
                 OpJson["type"] = stringifyType(Op->getType());
-                OpJson["value"] = stringifyPtr(*OpInstruction);
-              } else {
-                OpJson["description"] = "instruction";
-                OpJson["type"] = stringifyType(Op->getType());
-                OpJson["value"] = stringifyPtr(*OpInstruction);
+                OpJson["value"] = stringifyPtr(*OpDerivedUser);
+              } else if (UndefValue *Und = dyn_cast<UndefValue>(Op)) {
+                errs() << "Skipping UndefValue\n";
+                continue;
               }
             } else {
               errs() << "Unhandled operand of type: " << stringifyType(Op->getType()) << "\n";
