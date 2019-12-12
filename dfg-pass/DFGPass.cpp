@@ -171,24 +171,27 @@ namespace {
 
           // Add special out edges if the result of this instruction is returned
           // or used outside of this block
+          Optional<Instruction *> ExternalUse;
           for (auto *U : I.users()) {
             if (Instruction *UInst = dyn_cast<Instruction>(U)) {
               // If the use is not in the same basic block, consider it an out
               // edge
               if (UInst->getParent() != &B) {
-                errs() << "out?\n";
-                json OutJson;
-                OutJson["pointer"] = stringifyPtr(*UInst);
-                OutJson["description"] = "out";
-                OutJson["type"] = stringifyType(UInst->getType());
-                OutJson["value"] = stringifyPtr(I);
-                DestinationToOperands.push_back(OutJson);
-              } else {
-                errs() << "same parents?" << *UInst << I << "\n";
+                ExternalUse.emplace(UInst);
+                break;
               }
             } else {
               errs () << "Non-instruction use: " << *U << "\n";
             }
+          }
+
+          if (ExternalUse.hasValue()) {
+            json OutJson;
+            OutJson["pointer"] = stringifyPtr(*ExternalUse.getValue());
+            OutJson["description"] = "out";
+            OutJson["type"] = stringifyType(ExternalUse.getValue()->getType());
+            OutJson["value"] = stringifyPtr(I);
+            DestinationToOperands.push_back(OutJson);
           }
 
           DestinationToOperands.push_back(InstrJson);
