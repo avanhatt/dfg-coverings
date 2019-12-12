@@ -98,6 +98,7 @@ namespace {
               OpJson["description"] = "argument";
               OpJson["type"] = stringifyType(Op->getType());
               OpJson["value"] = stringifyPtr(*OpArgument);
+              OpJson["argument_number_in_function"] = OpArgument->getArgNo();
             } else if (llvm::Instruction* OpInstruction = dyn_cast<llvm::Instruction> (Op)) {
               // If in basic block mode, handle instructions from different
               // blocks

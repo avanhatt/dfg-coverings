@@ -39,7 +39,7 @@ def graph_from_json(fn):
 				E.append(Edge(constant_name, instruction_ptr, i))
 				const_num += 1
 			elif operand['description'] == 'argument':
-				V.add((Vertex(operand['value'], 'argument_%d' % i)))
+				V.add((Vertex(operand['value'], 'argument_%d' % operand['argument_number_in_function'])))
 				E.append(Edge(operand['value'], instruction_ptr, i))
 	return V, E
 
