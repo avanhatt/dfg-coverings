@@ -45,22 +45,22 @@ namespace {
     void getAnalysisUsage(AnalysisUsage &AU) const {
     }
 
-    std::string stringifyValue(Value &V) {
-      std::string ValueString;
+    string stringifyValue(Value &V) {
+      string ValueString;
       raw_string_ostream ValueStream(ValueString);
       ValueStream << V;
       return ValueStream.str();
     }
 
-    std::string stringifyPtr(Value &V) {
-      std::string PtrString;
+    string stringifyPtr(Value &V) {
+      string PtrString;
       raw_string_ostream PtrStream(PtrString);
       PtrStream << &V;
       return PtrStream.str();
     }
 
-    std::string stringifyType(Type *T) {
-      std::string TypeString;
+    string stringifyType(Type *T) {
+      string TypeString;
       raw_string_ostream TypeStream(TypeString);
       TypeStream << *T;
       return TypeStream.str();
@@ -142,25 +142,48 @@ namespace {
     virtual bool runOnModule(Module &M) {
 
       for (auto &F : M) {
-        runPerFunction(F);
+        dfgPerFunction(F);
       }
 
-      writeOutJson();
+      writeOutJsonDFG();
       string CallPython = "python3 dfg.py --input " + OutputFilename;
       system(CallPython.c_str());
+
+      json MatchesJson = readInJsonMatches();
+
+      for (auto &F : M) {
+        annotateMatchesPerFunction(MatchesJson, F);
+      }
 
       return true;
     }
 
-    void writeOutJson() {
-      std::ofstream JsonFile;
+    void writeOutJsonDFG() {
+      ofstream JsonFile;
       JsonFile.open(OutputFilename);
       JsonFile << DestinationToOperands.dump(4) << "\n";
       JsonFile.close();
     }
 
-    void runPerFunction(Function &F) {
-      int blockI = 0;
+    json readInJsonMatches() {
+      ifstream JsonFile;
+      stringstream Buffer;
+
+      size_t Pos = OutputFilename.find(".json");
+      if (Pos == string::npos) {
+        errs() << "Expected output filename to include .json suffix\n";
+        exit(1);
+      }
+      string MatchesFilename = OutputFilename.replace(Pos, OutputFilename.length(),
+        "-matches.json");
+
+      JsonFile.open(MatchesFilename);
+      Buffer << JsonFile.rdbuf();
+      JsonFile.close();
+      return json::parse(Buffer.str());
+    }
+
+    void dfgPerFunction(Function &F) {
       for (auto &B : F) {
         for (auto &I : B) {
 
@@ -211,6 +234,15 @@ namespace {
           }
 
           DestinationToOperands.push_back(InstrJson);
+        }
+      }
+    }
+
+    void annotateMatchesPerFunction(json matches, Function &F) {
+
+      // TODO: load matches data into a map for fast lookup
+      for (auto &B : F) {
+        for (auto &I : B) {
         }
       }
     }
