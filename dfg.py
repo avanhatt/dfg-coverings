@@ -8,6 +8,8 @@ from networkx import isomorphism
 Vertex = namedtuple('Vertex', ['id', 'opcode'])
 Edge = namedtuple('Edge', ['source', 'dest', 'arg_num_at_dest'])
 
+acceptable_identifiers = ['template_id', 'template_ID', 'name']
+
 # Returns:
 #	V: list of Vertices
 #	E: list of Edges
@@ -144,7 +146,6 @@ def visualize_graph(G):
 		print("viewer error", e)
 
 
-######### HELPERS FOR SUBGRAPH ######
 def is_subgraph(littleG, bigG):
 	if not (type(littleG) is nx.DiGraph): littleG = graph2nx(*littleG)
 	if not (type(bigG) is nx.DiGraph): bigG = graph2nx(*bigG)
@@ -169,8 +170,10 @@ def find_matches(littleG, bigG):
 	if not (type(littleG) is nx.DiGraph): littleG = graph2nx(*littleG)
 	if not (type(bigG) is nx.DiGraph): bigG = graph2nx(*bigG)
 
-	if 'template_id' in littleG.graph:
-		littleGName = littleG.graph['template_id']
+	for ident in acceptable_identifiers:
+		if ident in littleG.graph:
+			littleGName = littleG.graph[ident]
+			break
 	else:
 		littleGName = '[UNNAMED%d]' % find_matches.counter
 		find_matches.counter += 1
@@ -235,16 +238,20 @@ if __name__ == '__main__':
 
 	matches = []
 	for l in chains:
-		chain = construct_chain(l)
+		chain = graph2nx(*construct_chain(l))
 		s = "[" + ", ".join(l) + "]"
 		sj = s.ljust(20)
-		match = is_subgraph(chain, G)
-		print((g if match else r), sj, match, b)
-		if match:
-			matches.append({
-				"template_id" : s,
-				"match_idx" : 0,
-				"node_matches" : [], # TODO fill in id -> id from isomorphism
-			})
+		chain.name = s
+
+		matches.extend(find_matches(chain, G))
+
+		# match = is_subgraph(chain, G)
+		# print((g if match else r), sj, match, b)
+		# if match:
+		# 	matches.append({
+		# 		"template_id" : s,
+		# 		"match_idx" : 0,
+		# 		"node_matches" : [], # TODO fill in id -> id from isomorphism
+		# 	})
 
 	write_matches(matches, args.input)
