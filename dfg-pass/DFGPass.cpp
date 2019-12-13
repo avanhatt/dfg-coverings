@@ -35,6 +35,14 @@ namespace {
     cl::init(true) // Default value
   );
 
+  // -interactive is a command line argument to opt
+  static cl::opt<bool> IsInteractive(
+    "interactive", // Name of command line arg
+    cl::desc("Specify whether to pause for input in the python program"), // -help
+    // text
+    cl::init(false) // Default value
+  );
+
   struct DFGPass : public ModulePass {
     static char ID;
     json DestinationToOperands;
@@ -146,7 +154,8 @@ namespace {
       }
 
       writeOutJson();
-      string CallPython = "python3 dfg.py --input " + OutputFilename;
+      //string
+      string CallPython = "python3 dfg.py " + (string)(IsInteractive ? "-i " : "") + "--input " + OutputFilename;
       system(CallPython.c_str());
 
       return true;

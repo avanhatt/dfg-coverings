@@ -145,6 +145,18 @@ def visualize_graph(G):
 
 
 ######### HELPERS FOR SUBGRAPH ######
+def is_subgraph(littleG, bigG):
+	if not (type(littleG) is nx.DiGraph): littleG = graph2nx(*littleG)
+	if not (type(bigG) is nx.DiGraph): bigG = graph2nx(*bigG)
+
+	def node_match(data1, data2):
+		return data1['opcode'] == data2['opcode'] # and data1['arity'] == data2['arity']
+
+	# Returns "if a subgraph of G1 is isomorphic to G2", so pass the
+	# (presumably larger) graph G2 first
+	gm = isomorphism.DiGraphMatcher(bigG, littleG, node_match=node_match);
+
+	return gm.subgraph_is_isomorphic()
 
 """
 	Ideally: G1 and G2 are in networkx format, otherwise we'll have to convert, which could be expensive.
@@ -153,23 +165,42 @@ def visualize_graph(G):
 	  number of args
 	- constants and arguments can always be considered the same
 """
-def is_subgraph(G1, G2):
-	if not (type(G1) is nx.DiGraph): G1 = graph2nx(*G1)
-	if not (type(G2) is nx.DiGraph): G2 = graph2nx(*G2)
+def find_matches(littleG, bigG):
+	if not (type(littleG) is nx.DiGraph): littleG = graph2nx(*littleG)
+	if not (type(bigG) is nx.DiGraph): bigG = graph2nx(*bigG)
+
+	if 'template_id' in littleG.graph:
+		littleGName = littleG.graph['template_id']
+	else:
+		littleGName = '[UNNAMED%d]' % find_matches.counter
+		find_matches.counter += 1
+
 
 	def node_match(data1, data2):
 		return data1['opcode'] == data2['opcode'] # and data1['arity'] == data2['arity']
 
+	matches = []
+
+	while(True):
+		gm = isomorphism.DiGraphMatcher(bigG, littleG, node_match=node_match);
+		for i,match in enumerate(gm.subgraph_isomorphisms_iter()):
+			matches.append( dict(
+					template_id = littleGName,
+					match_idx = i,
+					node_matches = match
+				))
+			print(match)
+
+		break;
+
 	# Returns "if a subgraph of G1 is isomorphic to G2", so pass the
 	# (presumably larger) graph G2 first
-	gm = isomorphism.DiGraphMatcher(G2, G1, node_match=node_match);
+	return matches
 
-	# Oli TODO: call write_matches (once)
-	return gm.subgraph_is_isomorphic();
-
+find_matches.counter = 0
 
 """Write json [ <list of matches>
-	{"template ID" : <>,
+	{"template_ID" : <>,
 	 "match_idx" : 0, 1, 2, ...,
 	 node_matches: { id -> id} }]
 """
