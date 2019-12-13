@@ -5,7 +5,7 @@ from graphviz import Digraph
 import networkx as nx
 from networkx import isomorphism
 
-Vertex = namedtuple('Vertex', ['pointer', 'opcode'])
+Vertex = namedtuple('Vertex', ['id', 'opcode'])
 Edge = namedtuple('Edge', ['source', 'dest', 'arg_num_at_dest'])
 
 # Returns:
@@ -82,7 +82,7 @@ def graph2nx(V, E):
 
 	for v in V:
 		## add lone nodes?
-		#if v.pointer in G:
+		#if v.id in G:
 			G.add_node(v[0], **v._asdict())
 
 	for v in G:
@@ -102,7 +102,7 @@ def print_graph(G):
 	elif type(G) is tuple:
 		print('Vertices:')
 		for vertex in G[0]:
-			print('\t%s (%s)' % (vertex.pointer, vertex.opcode))
+			print('\t%s (%s)' % (vertex.id, vertex.opcode))
 		print('Edges:')
 		for edge in G[1]:
 			print('\t(%s, %s), argument %d' % (edge.source, edge.dest, edge.arg_num_at_dest))
@@ -134,7 +134,7 @@ def visualize_graph(G):
 				color='lightblue')
 		else:
 			dot.attr('node', shape='oval', style='solid', color='black')
-		dot.node(vertex.pointer, vertex.opcode)
+		dot.node(vertex.id, vertex.opcode)
 	for e in edge_gen:
 		dot.edge(*e)
 
@@ -164,6 +164,15 @@ def is_subgraph(G1, G2):
 	# (presumably larger) graph G2 first
 	gm = isomorphism.DiGraphMatcher(G2, G1, node_match=node_match);
 	return gm.subgraph_is_isomorphic();
+
+
+"""Write json [ <list of matches>
+	["template ID" : <>,
+	 "match_idx" : 0, 1, 2, ...,
+	 node_matches: { id -> id}
+						 ] ]
+
+"""
 
 if __name__ == '__main__':
 	parser = argparse.ArgumentParser()
