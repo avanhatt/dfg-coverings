@@ -1,15 +1,13 @@
-#include "llvm/Analysis/LoopInfo.h"
-#include "llvm/Analysis/LoopPass.h"
+#include "json.hpp"
 #include "llvm/Analysis/IVUsers.h"
-#include "llvm/Pass.h"
 #include "llvm/IR/Function.h"
-#include "llvm/Support/raw_ostream.h"
 #include "llvm/IR/LegacyPassManager.h"
+#include "llvm/Pass.h"
+#include "llvm/Support/CommandLine.h"
+#include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
 #include "llvm/Transforms/Utils.h"
 #include "llvm/Transforms/Utils/Mem2Reg.h"
-#include "llvm/Support/CommandLine.h"
-#include "json.hpp"
 
 #include <fstream>
 #include <sstream>
@@ -17,8 +15,8 @@
 #include <stdlib.h>
 
 using namespace llvm;
+using namespace nlohmann; // For JSON processing
 using namespace std;
-using namespace nlohmann;
 
 namespace {
 
@@ -221,5 +219,5 @@ namespace {
 
 char DFGPass::ID = 0;
 
-// Register the pass so `opt -loop-perf` runs it.
+// Register the pass so `opt -dfg-pass` runs it.
 static RegisterPass<DFGPass> Y("dfg-pass", "Data flow graph construction pass");

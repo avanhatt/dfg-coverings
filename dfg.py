@@ -66,16 +66,31 @@ def graph_from_json(fn):
 				E.append(Edge(operand['value'], instruction_ptr, i))
 	return V, E
 
+def construct_chain(opcodes):
+	V = set()
+	E = []
+
+	for i, op in enumerate(opcodes):
+		V.add((Vertex(str(i), op)))
+		if i != 0:
+			E.append(Edge(str(i-1), str(i), 0))
+
+	return V, E
+
+
+def mul_add_srem():
+	return construct_chain(["mul", "add", "srem"])
+
 def graph2nx(V, E):
 	G = nx.DiGraph();
 	for e in E:
-		G.add_edge(e[0], e[1], **e._asdict() )
+		G.add_edge(e[0], e[1], **e._asdict())
 
 
 	for v in V:
 		## add lone nodes?
 		#if v.pointer in G:
-			G.add_node(v[0], **v._asdict() )
+			G.add_node(v[0], **v._asdict())
 
 	for v in G:
 		G.nodes[v]['arity'] = G.in_degree(v)
@@ -107,16 +122,14 @@ def has_side_effects(opcode):
 	return any([o in opcode for o in opcodes])
 
 def visualize_graph(G):
+	if not (type(G) is nx.DiGraph): G = graph2nx(*G)
+
 	dot = Digraph()
-	if type(G) is nx.DiGraph:
-		node_gen = ((v, dat['opcode']) for v,dat in G.nodes(data=True))
-		edge_gen = G.edges
-	elif type(G) is tuple:
-		node_gen, edge_gen = G
+	node_gen = ((v, dat['opcode']) for v,dat in G.nodes(data=True))
+	edge_gen = G.edges
 
 	for n in node_gen:
 		vertex = Vertex(*n)
-		print(n, vertex)
 		# Hacky, should fix at some point
 		if has_side_effects(vertex.opcode):
 			dot.attr('node', shape='diamond', style='filled', color='pink')
@@ -148,20 +161,18 @@ def visualize_graph(G):
 	- constants and arguments can always be considered the same
 """
 def is_subgraph(G1, G2):
-	if not (type(G1) is nx.DiGraph): G1 = graph2nx(G1)
-	if not (type(G2) is nx.DiGraph): G2 = graph2nx(G2)
+	if not (type(G1) is nx.DiGraph): G1 = graph2nx(*G1)
+	if not (type(G2) is nx.DiGraph): G2 = graph2nx(*G2)
 
-	def nodes_R_equalish(data1, data2):
-		return data1['opcode'] == data2['opcode'] and data1['arity'] == data2['arity']
+	def node_match(data1, data2):
+		print(data1['opcode'])
+		print(data2['opcode'])
+		return data1['opcode'] == data2['opcode'] # and data1['arity'] == data2['arity']
 
-
-	gm = isomorphism.DiGraphMatcher(G1,G2, node_match = nodes_R_equalish);
+	# Returns "if a subgraph of G1 is isomorphic to G2", so pass the
+	# (presumably larger) graph G2 first
+	gm = isomorphism.DiGraphMatcher(G2, G1, node_match=node_match);
 	return gm.subgraph_is_isomorphic();
-
-	# start with brute force version:
-	#for v
-
-	# return False
 
 if __name__ == '__main__':
 	parser = argparse.ArgumentParser()
@@ -171,4 +182,6 @@ if __name__ == '__main__':
 	G = graph2nx(*graph_from_json(args.input))
 	# print_graph(V, E)
 	visualize_graph(G)
-	print(is_subgraph(G, G))
+	mul_add_srem_chain = mul_add_srem()
+	# visualize_graph(mul_add_srem_chain)
+	print(is_subgraph(mul_add_srem_chain, G))
