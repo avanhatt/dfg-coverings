@@ -18,4 +18,3 @@ clean:
 	clang $(CFLAGS) -O1 -emit-llvm -Xclang -disable-O0-optnone -S $< -o $@
 	opt -mem2reg -inline -S $@ -o $@
 	opt -load $(BUILD_DIR)/dfg-pass/libDFGPass.* -dfg-pass -S $@ -o /dev/null -json-output $@.json
-	python3 -i dfg.py --input $@.json

@@ -10,8 +10,11 @@
 #include "llvm/Transforms/Utils/Mem2Reg.h"
 #include "llvm/Support/CommandLine.h"
 #include "json.hpp"
+
 #include <fstream>
 #include <sstream>
+#include <stdio.h>
+#include <stdlib.h>
 
 using namespace llvm;
 using namespace std;
@@ -34,10 +37,10 @@ namespace {
     cl::init(true) // Default value
   );
 
-  struct DFGPass : public FunctionPass {
+  struct DFGPass : public ModulePass {
     static char ID;
     json DestinationToOperands;
-    DFGPass() : FunctionPass(ID) { }
+    DFGPass() : ModulePass(ID) { }
 
     ~DFGPass() {
       std::ofstream JsonFile;
@@ -143,6 +146,14 @@ namespace {
       return OpJson;
     }
 
+    virtual bool runOnModule(Module &M) {
+
+      string CallPython = "python3 dfg.py --input " + OutputFilename;
+      system(CallPython.c_str());
+
+      return true;
+    }
+
     virtual bool runOnFunction(Function &F) {
       int blockI = 0;
       for (auto &B : F) {
@@ -197,6 +208,7 @@ namespace {
           DestinationToOperands.push_back(InstrJson);
         }
       }
+
       return false;
     }
   };
@@ -206,9 +218,3 @@ char DFGPass::ID = 0;
 
 // Register the pass so `opt -loop-perf` runs it.
 static RegisterPass<DFGPass> Y("dfg-pass", "Data flow graph construction pass");
-
-
-
-
-
-
