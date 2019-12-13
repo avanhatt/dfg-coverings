@@ -7,9 +7,6 @@ from networkx import isomorphism
 
 Vertex = namedtuple('Vertex', ['pointer', 'opcode'])
 Edge = namedtuple('Edge', ['source', 'dest', 'arg_num_at_dest'])
-#Edge = namedtuple('Edge', ['source', 'dest', 'arg_num_at_dest'])
-
-
 
 # Returns:
 #	V: list of Vertices
@@ -76,10 +73,6 @@ def construct_chain(opcodes):
 			E.append(Edge(str(i-1), str(i), 0))
 
 	return V, E
-
-
-def mul_add_srem():
-	return construct_chain(["mul", "add", "srem"])
 
 def graph2nx(V, E):
 	G = nx.DiGraph();
@@ -165,8 +158,6 @@ def is_subgraph(G1, G2):
 	if not (type(G2) is nx.DiGraph): G2 = graph2nx(*G2)
 
 	def node_match(data1, data2):
-		print(data1['opcode'])
-		print(data2['opcode'])
 		return data1['opcode'] == data2['opcode'] # and data1['arity'] == data2['arity']
 
 	# Returns "if a subgraph of G1 is isomorphic to G2", so pass the
@@ -182,6 +173,22 @@ if __name__ == '__main__':
 	G = graph2nx(*graph_from_json(args.input))
 	# print_graph(V, E)
 	visualize_graph(G)
-	mul_add_srem_chain = mul_add_srem()
-	# visualize_graph(mul_add_srem_chain)
-	print(is_subgraph(mul_add_srem_chain, G))
+
+	chains = [
+		["mul", "add", "srem"],
+		["shl", "add"],
+		["sdiv", "mul", "add"],
+	]
+
+	# For colored printing
+	g = "\033[92m"
+	r = "\033[91m"
+	b = "\033[00m"
+
+	print("\nChain matches:")
+	for l in chains:
+		chain = construct_chain(l)
+		s = "[" + ", ".join(l) + "]:"
+		s = s.ljust(20)
+		match = is_subgraph(chain, G)
+		print((g if match else r), s, match, b)

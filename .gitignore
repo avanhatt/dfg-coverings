@@ -9,7 +9,7 @@ __pycache__/
 
 # Clang outputs
 *.ll
-*.ll.json
+*.json
 
 # C extensions
 *.so
