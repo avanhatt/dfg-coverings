@@ -173,9 +173,11 @@ def is_subgraph(G1, G2):
 	 "match_idx" : 0, 1, 2, ...,
 	 node_matches: { id -> id} }]
 """
+def write_matches(matches, filename):
+	filename = filename.replace(".json", "-matches.json", 1)
 
-def write_matches(matches):
-	# Alexa TODO
+	with open(filename, "w") as file:
+		file.write(json.dumps(matches, indent=4))
 	pass
 
 if __name__ == '__main__':
@@ -200,9 +202,18 @@ if __name__ == '__main__':
 
 	print("\nChain matches:")
 
+	matches = []
 	for l in chains:
 		chain = construct_chain(l)
-		s = "[" + ", ".join(l) + "]:"
-		s = s.ljust(20)
+		s = "[" + ", ".join(l) + "]"
+		sj = s.ljust(20)
 		match = is_subgraph(chain, G)
-		print((g if match else r), s, match, b)
+		print((g if match else r), sj, match, b)
+		if match:
+			matches.append({
+				"template_id" : s,
+				"match_idx" : 0,
+				"node_matches" : [], # TODO fill in id -> id from isomorphism
+			})
+
+	write_matches(matches, args.input)
