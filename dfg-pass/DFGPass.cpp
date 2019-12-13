@@ -42,12 +42,7 @@ namespace {
     json DestinationToOperands;
     DFGPass() : ModulePass(ID) { }
 
-    ~DFGPass() {
-      std::ofstream JsonFile;
-      JsonFile.open(OutputFilename);
-      JsonFile << DestinationToOperands.dump(4) << "\n";
-      JsonFile.close();
-    }
+    ~DFGPass() {}
 
     void getAnalysisUsage(AnalysisUsage &AU) const {
     }
@@ -148,13 +143,25 @@ namespace {
 
     virtual bool runOnModule(Module &M) {
 
+      for (auto &F : M) {
+        runPerFunction(F);
+      }
+
+      writeOutJson();
       string CallPython = "python3 dfg.py --input " + OutputFilename;
       system(CallPython.c_str());
 
       return true;
     }
 
-    virtual bool runOnFunction(Function &F) {
+    void writeOutJson() {
+      std::ofstream JsonFile;
+      JsonFile.open(OutputFilename);
+      JsonFile << DestinationToOperands.dump(4) << "\n";
+      JsonFile.close();
+    }
+
+    void runPerFunction(Function &F) {
       int blockI = 0;
       for (auto &B : F) {
         for (auto &I : B) {
@@ -208,8 +215,6 @@ namespace {
           DestinationToOperands.push_back(InstrJson);
         }
       }
-
-      return false;
     }
   };
 }
