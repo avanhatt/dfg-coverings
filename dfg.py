@@ -163,16 +163,20 @@ def is_subgraph(G1, G2):
 	# Returns "if a subgraph of G1 is isomorphic to G2", so pass the
 	# (presumably larger) graph G2 first
 	gm = isomorphism.DiGraphMatcher(G2, G1, node_match=node_match);
+
+	# Oli TODO: call write_matches (once)
 	return gm.subgraph_is_isomorphic();
 
 
 """Write json [ <list of matches>
-	["template ID" : <>,
+	{"template ID" : <>,
 	 "match_idx" : 0, 1, 2, ...,
-	 node_matches: { id -> id}
-						 ] ]
-
+	 node_matches: { id -> id} }]
 """
+
+def write_matches(matches):
+	# Alexa TODO
+	pass
 
 if __name__ == '__main__':
 	parser = argparse.ArgumentParser()
@@ -195,6 +199,7 @@ if __name__ == '__main__':
 	b = "\033[00m"
 
 	print("\nChain matches:")
+
 	for l in chains:
 		chain = construct_chain(l)
 		s = "[" + ", ".join(l) + "]:"
