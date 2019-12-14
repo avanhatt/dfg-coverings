@@ -260,21 +260,26 @@ namespace {
     }
 
     // Map from individual instruction to the match data for quick lookup
-    map<string, json *> jsonToInstructionMatches(json Matches) {
-      map<string, json *> PerInstruction;
+    map<string, json> jsonToInstructionMatches(json Matches) {
+      map<string, json> PerInstruction;
 
       for (json &Match : Matches) {
         for (auto &[Key, Value] : Match["node_matches"].items()) {
           string Instruction = Key;
-          json *MatchPtr = &Match;
-          PerInstruction[Instruction] = MatchPtr;
+          PerInstruction[Instruction] = Match;
         }
       }
 
       return PerInstruction;
     }
 
-    void annotateMatchesPerFunction(map<string, json *> Matches, Function &F) {
+    void addMetadataString(Instruction *I, string Name, string Md) {
+      LLVMContext &C = I->getContext();
+      MDNode *Node = MDNode::get(C, MDString::get(C, Md));
+      I->setMetadata(Name, Node);
+    }
+
+    void annotateMatchesPerFunction(map<string, json> Matches, Function &F) {
       for (auto &B : F) {
         for (auto &I : B) {
 
@@ -283,7 +288,19 @@ namespace {
           if (Matches.find(IPtr) == Matches.end()) continue;
 
           InstructionsMatched++;
-          errs() << "match found for: " << IPtr << "\n";
+
+          json MatchJson = Matches[IPtr];
+
+          addMetadataString(&I, "template_id", (string)MatchJson["template_id"]);
+
+          string MatchIdx = to_string((int)(MatchJson["match_idx"]));
+          addMetadataString(&I, "match_idx", MatchIdx);
+
+          string template_node = MatchJson["node_matches"][IPtr];
+          addMetadataString(&I, "template_node", template_node);
+
+
+
 
 
 
