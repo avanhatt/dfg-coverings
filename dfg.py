@@ -116,12 +116,18 @@ def has_side_effects(opcode):
 	opcodes = ["ret", "br", "call", "out", "store"]
 	return any([o in opcode for o in opcodes])
 
-def visualize_graph(G):
+
+def visualize_graph(G, matches=None):
 	if not (type(G) is nx.DiGraph): G = graph2nx(*G)
 
 	dot = Digraph()
 	node_gen = ((v, dat['opcode']) for v,dat in G.nodes(data=True))
 	edge_gen = G.edges
+
+	# pull out pointers of instructions that match a subgraph
+	pointer_matches = []
+	if matches:
+		pointer_matches = [p for m in matches for p in m['node_matches']]
 
 	for n in node_gen:
 		vertex = Vertex(*n)
@@ -135,7 +141,14 @@ def visualize_graph(G):
 			dot.attr('node', shape='diamond', style='filled',
 				color='lightblue')
 		else:
-			dot.attr('node', shape='oval', style='solid', color='black')
+			# color operations of all subgraph matches at once for now
+			# TODO may need to save a different file for each subgraph
+			# if matches overlap
+			# TODO different colors for different chains
+			if vertex.id in pointer_matches:
+				dot.attr('node', shape='oval', style='filled', color='red')
+			else:
+				dot.attr('node', shape='oval', style='solid', color='black')
 		dot.node(vertex.id, vertex.opcode)
 	for e in edge_gen:
 		dot.edge(*e)
@@ -255,3 +268,5 @@ if __name__ == '__main__':
 		# 	})
 
 	write_matches(matches, args.input)
+
+	visualize_graph(G, matches)
