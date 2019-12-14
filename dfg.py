@@ -197,20 +197,15 @@ def find_matches(littleG, bigG):
 
 	matches = []
 
-	while(True):
-		gm = isomorphism.DiGraphMatcher(bigG, littleG, node_match=node_match);
-		for i,match in enumerate(gm.subgraph_isomorphisms_iter()):
-			matches.append( dict(
-					template_id = littleGName,
-					match_idx = i,
-					node_matches = match
-				))
-			print(match)
+	gm = isomorphism.DiGraphMatcher(bigG, littleG, node_match=node_match);
+	for i,match in enumerate(gm.subgraph_isomorphisms_iter()):
+		matches.append( dict(
+				template_id = littleGName,
+				match_idx = i,
+				node_matches = match
+			))
+		print(match)
 
-		break;
-
-	# Returns "if a subgraph of G1 is isomorphic to G2", so pass the
-	# (presumably larger) graph G2 first
 	return matches
 
 find_matches.counter = 0
@@ -253,11 +248,12 @@ if __name__ == '__main__':
 	for l in chains:
 		chain = graph2nx(*construct_chain(l))
 		s = "[" + ", ".join(l) + "]"
-		sj = s.ljust(20)
+		print(s)
 		chain.name = s
 
 		matches.extend(find_matches(chain, G))
 
+		# sj = s.ljust(20)
 		# match = is_subgraph(chain, G)
 		# print((g if match else r), sj, match, b)
 		# if match:

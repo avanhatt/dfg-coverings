@@ -4,6 +4,7 @@
 #include "llvm/IR/LegacyPassManager.h"
 #include "llvm/Pass.h"
 #include "llvm/Support/CommandLine.h"
+#include "llvm/Support/FormatVariadic.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
 #include "llvm/Transforms/Utils.h"
@@ -46,6 +47,8 @@ namespace {
   struct DFGPass : public ModulePass {
     static char ID;
     json DestinationToOperands;
+    int TotalInstructions = 0;
+    int InstructionsMatched = 0;
     DFGPass() : ModulePass(ID) { }
 
     ~DFGPass() {}
@@ -160,9 +163,16 @@ namespace {
 
       json MatchesJson = readInJsonMatches();
 
+      auto PerInstruction = jsonToInstructionMatches(MatchesJson);
+
       for (auto &F : M) {
-        annotateMatchesPerFunction(MatchesJson, F);
+        annotateMatchesPerFunction(PerInstruction, F);
       }
+
+
+      auto S = formatv("({0:P})", (float)InstructionsMatched/TotalInstructions);
+      errs() << InstructionsMatched << "/" << TotalInstructions << " " << S <<
+        " instructions matched\n";
 
       return true;
     }
@@ -195,6 +205,8 @@ namespace {
     void dfgPerFunction(Function &F) {
       for (auto &B : F) {
         for (auto &I : B) {
+
+          TotalInstructions++;
 
           // Skip instructions without dependencies or side effects
           if (skipInstruction(I)) continue;
@@ -247,11 +259,34 @@ namespace {
       }
     }
 
-    void annotateMatchesPerFunction(json matches, Function &F) {
+    // Map from individual instruction to the match data for quick lookup
+    map<string, json *> jsonToInstructionMatches(json Matches) {
+      map<string, json *> PerInstruction;
 
-      // TODO: load matches data into a map for fast lookup
+      for (json &Match : Matches) {
+        for (auto &[Key, Value] : Match["node_matches"].items()) {
+          string Instruction = Key;
+          json *MatchPtr = &Match;
+          PerInstruction[Instruction] = MatchPtr;
+        }
+      }
+
+      return PerInstruction;
+    }
+
+    void annotateMatchesPerFunction(map<string, json *> Matches, Function &F) {
       for (auto &B : F) {
         for (auto &I : B) {
+
+          // Skip instructions that were not matched
+          string IPtr = stringifyPtr(I);
+          if (Matches.find(IPtr) == Matches.end()) continue;
+
+          InstructionsMatched++;
+          errs() << "match found for: " << IPtr << "\n";
+
+
+
         }
       }
     }
