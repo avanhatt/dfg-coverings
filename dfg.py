@@ -210,6 +210,30 @@ def find_matches(littleG, bigG):
 
 find_matches.counter = 0
 
+
+"""
+return a collection of graphs like the chains from earlier, that are small and cover the most
+"""
+def guess_best_subgraphs( G ) :
+	pass
+
+
+def estimate_coverage(Hs, G_orignial) :
+	G = G_original.copy()
+
+	for H in Hs:
+		matches = find_matches(H, G)
+
+		for m in matches:
+			G.remove_nodes_from( m['node_matches'].keys() )
+
+
+	print(len(G_original), len(G))
+	return 1 - (len(G) / len(G_original))
+
+
+
+
 """Write json [ <list of matches>
 	{"template_ID" : <>,
 	 "match_idx" : 0, 1, 2, ...,
