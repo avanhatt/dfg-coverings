@@ -76,7 +76,7 @@ def construct_chain(opcodes):
 
 	return V, E
 
-def graph2nx(V, E):
+def graph2nx(V, E, **graphattrs):
 	G = nx.DiGraph();
 	for e in E:
 		G.add_edge(e[0], e[1], **e._asdict())
@@ -90,6 +90,7 @@ def graph2nx(V, E):
 	for v in G:
 		G.nodes[v]['arity'] = G.in_degree(v)
 
+	G.graph = graphattrs
 	return G
 
 """ Updated for networkx representation. """
@@ -261,6 +262,8 @@ if __name__ == '__main__':
 		["sdiv", "mul", "add"],
 	]
 
+	Hs = [ graph2nx(*construct_chain(l), name= "[" + ", ".join(l) + "]") for l in chains ]
+
 	# For colored printing
 	g = "\033[92m"
 	r = "\033[91m"
@@ -269,13 +272,8 @@ if __name__ == '__main__':
 	print("\nChain matches:")
 
 	matches = []
-	for l in chains:
-		chain = graph2nx(*construct_chain(l))
-		s = "[" + ", ".join(l) + "]"
-		print(s)
-		chain.name = s
-
-		matches.extend(find_matches(chain, G))
+	for H in Hs:
+		matches.extend(find_matches(H, G))
 
 		# sj = s.ljust(20)
 		# match = is_subgraph(chain, G)
@@ -287,6 +285,7 @@ if __name__ == '__main__':
 		# 		"node_matches" : [], # TODO fill in id -> id from isomorphism
 		# 	})
 
+	estimate_coverage(Hs, G)
 	write_matches(matches, args.input)
 
 	visualize_graph(G, matches)
