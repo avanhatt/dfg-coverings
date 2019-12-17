@@ -21,6 +21,10 @@ using namespace std;
 
 namespace {
 
+  static const string TemplateId = "template_id";
+  static const string MatchIdx = "match_idx";
+  static const string TemplateNode = "node_matches";
+
   // -info is a command line argument to opt
   static cl::opt<string> OutputFilename(
     "json-output", // Name of command line arg
@@ -145,7 +149,6 @@ namespace {
       } else {
         errs() << "Unhandled operand of type: " << stringifyType(Op->getType())
           << "\n";
-        // errs() << *Op << "\n";
       }
       return OpJson;
     }
@@ -266,14 +269,7 @@ namespace {
       for (json &Match : Matches) {
         for (auto &[Key, Value] : Match["node_matches"].items()) {
           string Instruction = Key;
-          if(PerInstruction.count(Instruction)) {
-            errs() << "YO, PerInstruction" << "\n";
-            PerInstruction[Instruction] += Match;
-          }
-          else {
-            errs() << "SECOND BRANCH" << "\n";
-            PerInstruction[Instruction] = json::array({Match});
-          }
+          PerInstruction[Instruction] = Match;
         }
       }
 
@@ -294,18 +290,17 @@ namespace {
           string IPtr = stringifyPtr(I);
           if (Matches.find(IPtr) == Matches.end()) continue;
 
-          for( json MatchJson : Matches[IPtr]) {
-            string mtid = (string)MatchJson["template_id"];
+          InstructionsMatched++;
+          json MatchJson = Matches[IPtr];
 
-              InstructionsMatched++;
-              addMetadataString(&I, "template_id", mtid);
+          string TemplateIdStr = (string)MatchJson[TemplateId];
+          addMetadataString(&I, TemplateId, TemplateIdStr);
 
-              string MatchIdx = to_string((int)(MatchJson["match_idx"]));
-              addMetadataString(&I, "match_idx", MatchIdx);
+          string MatchIdxStr = to_string((int)(MatchJson[MatchIdx]));
+          addMetadataString(&I, MatchIdx, MatchIdxStr);
 
-              string template_node = MatchJson["node_matches"][IPtr];
-              addMetadataString(&I, "template_node", template_node);
-          }
+          string TemplateNodeStr = MatchJson[TemplateNode][IPtr];
+          addMetadataString(&I, TemplateNode, TemplateNodeStr);
         }
       }
     }
