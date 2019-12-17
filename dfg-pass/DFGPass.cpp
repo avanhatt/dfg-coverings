@@ -9,21 +9,20 @@
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
 #include "llvm/Transforms/Utils.h"
 #include "llvm/Transforms/Utils/Mem2Reg.h"
+#include "llvm/Transforms/Utils/ModuleUtils.h"
 
 #include <fstream>
 #include <sstream>
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "Shared.h"
+
 using namespace llvm;
 using namespace nlohmann; // For JSON processing
 using namespace std;
 
 namespace {
-
-  static const string TemplateId = "template_id";
-  static const string MatchIdx = "match_idx";
-  static const string TemplateNode = "node_matches";
 
   // -info is a command line argument to opt
   static cl::opt<string> OutputFilename(
@@ -36,7 +35,6 @@ namespace {
   static cl::opt<bool> PerBasicBlock(
     "blocks", // Name of command line arg
     cl::desc("Specify whether to output subgraphs per basic block"), // -help
-    // text
     cl::init(true) // Default value
   );
 
@@ -44,8 +42,14 @@ namespace {
   static cl::opt<bool> IsInteractive(
     "interactive", // Name of command line arg
     cl::desc("Specify whether to pause for input in the python program"), // -help
-    // text
     cl::init(false) // Default value
+  );
+
+    // -profiling is a command line argument to opt
+  static cl::opt<bool> Profiling(
+    "profiling", // Name of command line arg
+    cl::desc("Specify whether to insert dynamic profiling instructions"), // -help
+    cl::init(true) // Default value
   );
 
   struct DFGPass : public ModulePass {
@@ -155,13 +159,18 @@ namespace {
 
     virtual bool runOnModule(Module &M) {
 
+      if (Profiling) {
+        declareProfilingFunctions(&M);
+      }
+
       for (auto &F : M) {
         dfgPerFunction(F);
       }
 
       writeOutJsonDFG();
       //string
-      string CallPython = "python3 dfg.py " + (string)(IsInteractive ? "-i " : "") + "--input " + OutputFilename;
+      string CallPython = "python3 dfg.py " + (string)(IsInteractive ? "-i " : "")
+        + "--input " + OutputFilename;
       system(CallPython.c_str());
 
       json MatchesJson = readInJsonMatches();
@@ -172,12 +181,28 @@ namespace {
         annotateMatchesPerFunction(PerInstruction, F);
       }
 
-
-      auto S = formatv("({0:P})", (float)InstructionsMatched/TotalInstructions);
-      errs() << InstructionsMatched << "/" << TotalInstructions << " " << S <<
-        " instructions matched\n";
+      string S = formatv("{0}/{1} ({2:P}) static instructions matched\n",
+        InstructionsMatched,
+        TotalInstructions,
+        (float)InstructionsMatched/TotalInstructions);
+      errs() << S;
 
       return true;
+    }
+
+    void declareProfilingFunctions(Module *M) {
+      auto VoidType = Type::getVoidTy(M->getContext());
+      auto IntType = Type::getInt32Ty(M->getContext());
+      auto IncrementType = FunctionType::get(VoidType, {IntType, IntType},
+        /*isVarArg*/false);
+      Function::Create(IncrementType, Function::ExternalLinkage,
+        "incremementCounts", M);
+
+      auto PrintDynamicType = FunctionType::get(VoidType, {},
+        /*isVarArg*/false);
+      auto PrintDynamic = Function::Create(PrintDynamicType,
+        Function::ExternalLinkage, "printDynamicProfiling", M);
+      appendToGlobalDtors(*M, PrintDynamic, /*Priority*/0);
     }
 
     void writeOutJsonDFG() {
@@ -284,6 +309,8 @@ namespace {
 
     void annotateMatchesPerFunction(map<string, json> Matches, Function &F) {
       for (auto &B : F) {
+        int BlockMatchedInstructions = 0;
+
         for (auto &I : B) {
 
           // Skip instructions that were not matched
@@ -291,6 +318,7 @@ namespace {
           if (Matches.find(IPtr) == Matches.end()) continue;
 
           InstructionsMatched++;
+          BlockMatchedInstructions++;
           json MatchJson = Matches[IPtr];
 
           string TemplateIdStr = (string)MatchJson[TemplateId];
@@ -301,6 +329,11 @@ namespace {
 
           string TemplateNodeStr = MatchJson[TemplateNode][IPtr];
           addMetadataString(&I, TemplateNode, TemplateNodeStr);
+        }
+
+        // If instrumenting profiling, increment counters
+        if (Profiling) {
+
         }
       }
     }

@@ -7,6 +7,16 @@ EMBENCH_DIR = $(TEST_DIR)/embench
 
 CFLAGS += -I $(EMBENCH_DIR)/support/ -DCPU_MHZ=1
 
+.PHONY: pass clean
+
+default: pass
+
+profiling:
+	clang -S -emit-llvm dfg-pass/Profiling.cpp
+
+%-profiling: %.ll
+	clang  Profiling.ll $*-matched.ll -o $@
+
 pass:
 	cd $(BUILD_DIR); make; cd $(TOP_DIR)
 
