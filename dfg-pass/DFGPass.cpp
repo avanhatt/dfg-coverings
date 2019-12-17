@@ -287,8 +287,6 @@ namespace {
     }
 
     void annotateMatchesPerFunction(map<string, json> Matches, Function &F) {
-      // set<string> used;
-
       for (auto &B : F) {
         for (auto &I : B) {
 
@@ -299,10 +297,7 @@ namespace {
           for( json MatchJson : Matches[IPtr]) {
             string mtid = (string)MatchJson["template_id"];
 
-            // if(!used.count(IPtr)) {
               InstructionsMatched++;
-              // used.insert(IPtr);
-
               addMetadataString(&I, "template_id", mtid);
 
               string MatchIdx = to_string((int)(MatchJson["match_idx"]));
@@ -310,17 +305,7 @@ namespace {
 
               string template_node = MatchJson["node_matches"][IPtr];
               addMetadataString(&I, "template_node", template_node);
-
-              break;
-            // }
           }
-
-
-
-
-
-
-
         }
       }
     }

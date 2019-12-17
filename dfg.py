@@ -219,7 +219,7 @@ def guess_best_subgraphs( G ) :
 	pass
 
 
-def estimate_coverage(Hs, G_orignial) :
+def estimate_coverage(Hs, G_original) :
 	G = G_original.copy()
 
 	for H in Hs:
@@ -228,12 +228,8 @@ def estimate_coverage(Hs, G_orignial) :
 		for m in matches:
 			G.remove_nodes_from( m['node_matches'].keys() )
 
-
 	print(len(G_original), len(G))
 	return 1 - (len(G) / len(G_original))
-
-
-
 
 """Write json [ <list of matches>
 	{"template_ID" : <>,
@@ -274,16 +270,6 @@ if __name__ == '__main__':
 	matches = []
 	for H in Hs:
 		matches.extend(find_matches(H, G))
-
-		# sj = s.ljust(20)
-		# match = is_subgraph(chain, G)
-		# print((g if match else r), sj, match, b)
-		# if match:
-		# 	matches.append({
-		# 		"template_id" : s,
-		# 		"match_idx" : 0,
-		# 		"node_matches" : [], # TODO fill in id -> id from isomorphism
-		# 	})
 
 	estimate_coverage(Hs, G)
 	write_matches(matches, args.input)
