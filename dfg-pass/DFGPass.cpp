@@ -266,7 +266,14 @@ namespace {
       for (json &Match : Matches) {
         for (auto &[Key, Value] : Match["node_matches"].items()) {
           string Instruction = Key;
-          PerInstruction[Instruction] = Match;
+          if(PerInstruction.count(Instruction)) {
+            errs() << "YO, PerInstruction" << "\n";
+            PerInstruction[Instruction] += Match;
+          }
+          else {
+            errs() << "SECOND BRANCH" << "\n";
+            PerInstruction[Instruction] = json::array({Match});
+          }
         }
       }
 
@@ -280,6 +287,8 @@ namespace {
     }
 
     void annotateMatchesPerFunction(map<string, json> Matches, Function &F) {
+      set<string> used;
+
       for (auto &B : F) {
         for (auto &I : B) {
 
@@ -287,17 +296,23 @@ namespace {
           string IPtr = stringifyPtr(I);
           if (Matches.find(IPtr) == Matches.end()) continue;
 
-          InstructionsMatched++;
+          for( json MatchJson : Matches[IPtr]) {
+            string mtid = (string)MatchJson["template_id"];
 
-          json MatchJson = Matches[IPtr];
+            if(!used.count(mtid)) {
+              InstructionsMatched++;
+              used.insert(mtid);
 
-          addMetadataString(&I, "template_id", (string)MatchJson["template_id"]);
+              addMetadataString(&I, "template_id", mtid);
 
-          string MatchIdx = to_string((int)(MatchJson["match_idx"]));
-          addMetadataString(&I, "match_idx", MatchIdx);
+              string MatchIdx = to_string((int)(MatchJson["match_idx"]));
+              addMetadataString(&I, "match_idx", MatchIdx);
 
-          string template_node = MatchJson["node_matches"][IPtr];
-          addMetadataString(&I, "template_node", template_node);
+              string template_node = MatchJson["node_matches"][IPtr];
+              addMetadataString(&I, "template_node", template_node);
+            }
+          }
+
 
 
 
