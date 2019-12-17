@@ -205,7 +205,6 @@ def find_matches(littleG, bigG):
 				match_idx = i,
 				node_matches = match
 			))
-		print(match)
 
 	return matches
 
@@ -231,17 +230,36 @@ def estimate_coverage(Hs, G_original) :
 	print(len(G_original), len(G))
 	return 1 - (len(G) / len(G_original))
 
+'''
+Returns: list of mutually exclusive matches from all matches
+'''
+def pick_mutually_exclusive_matches(matches, G):
+	# heuristic: sort matches by size
+	# pick matches one by one if they don't overlap any previous matches
+	# TODO: exhaustively try all combinations of subgraphs,
+	#       picking the combo with the most coverage
+	#       because biggest first doesn't guarantee best coverage
+	matches_longest_to_shortest = sorted(matches, reverse=True, key=lambda m: len(m['node_matches']))
+	matches_exclusive = []
+	covered_nodes = set()
+	for match in matches_longest_to_shortest:
+		pointers = match['node_matches'].keys()
+		if any([p in covered_nodes for p in pointers]):
+			continue
+		covered_nodes.update(pointers)
+		matches_exclusive.append(match)
+	return matches_exclusive
+
 """Write json [ <list of matches>
 	{"template_ID" : <>,
 	 "match_idx" : 0, 1, 2, ...,
 	 node_matches: { id -> id} }]
 """
-def write_matches(matches, filename):
-	filename = filename.replace(".json", "-matches.json", 1)
+def write_matches(matches, filename, extra_filename=''):
+	filename = filename.replace(".json", "-matches%s.json" % extra_filename, 1)
 
 	with open(filename, "w") as file:
 		file.write(json.dumps(matches, indent=4))
-	pass
 
 if __name__ == '__main__':
 	parser = argparse.ArgumentParser()
@@ -256,6 +274,7 @@ if __name__ == '__main__':
 		["mul", "add", "srem"],
 		["shl", "add"],
 		["sdiv", "mul", "add"],
+		["load", "mul"],
 	]
 
 	Hs = [ graph2nx(*construct_chain(l), name= "[" + ", ".join(l) + "]") for l in chains ]
@@ -265,13 +284,13 @@ if __name__ == '__main__':
 	r = "\033[91m"
 	b = "\033[00m"
 
-	print("\nChain matches:")
-
 	matches = []
 	for H in Hs:
 		matches.extend(find_matches(H, G))
 
-	estimate_coverage(Hs, G)
-	write_matches(matches, args.input)
-
-	visualize_graph(G, matches)
+	matches_exclusive = pick_mutually_exclusive_matches(matches, G)
+	# save all matches (which might overlap)
+	write_matches(matches, args.input, extra_filename='-full')
+	# save mutually exclusive matches for the LLVM pass to read
+	write_matches(matches_exclusive, args.input)
+	visualize_graph(G, matches_exclusive)
