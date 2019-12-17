@@ -250,6 +250,51 @@ def pick_mutually_exclusive_matches(matches, G):
 		matches_exclusive.append(match)
 	return matches_exclusive
 
+# Prints the number of times each 2-node subgraph appears in the graph
+unacceptable_subgraph_nodes = ['argument', 'constant', 'external', 'out']
+def find_two_node_matches(G):
+	def node_match(data1, data2):
+		return data1['opcode'] == data2['opcode'] # and data1['arity'] == data2['arity']
+
+	subgraph_to_number_of_matches = {}
+
+	node_pointer_to_opcode = {}
+	for v, v_data in G.nodes(data=True):
+	 	node_pointer_to_opcode[v] = v_data['opcode']
+	checked_subgraphs = set()
+	for s, t, e_data in G.edges(data=True):
+		s_op = node_pointer_to_opcode[s]
+		t_op = node_pointer_to_opcode[t]
+		if any([prefix in s_op for prefix in unacceptable_subgraph_nodes]) \
+		or any([prefix in t_op for prefix in unacceptable_subgraph_nodes]):
+			continue
+		
+		subgraph_opcode_edges = '[(%s, %s)]' % (s_op, t_op)
+		if subgraph_opcode_edges in checked_subgraphs:
+			continue
+		
+
+		H = G.edge_subgraph([(s, t)]).copy()
+		matches = []
+
+		gm = isomorphism.DiGraphMatcher(G, H, node_match=node_match);
+		for i, match in enumerate(gm.subgraph_isomorphisms_iter()):
+			matches.append( dict(
+				template_id = subgraph_opcode_edges,
+				match_idx = i,
+				node_matches = match
+			))
+
+		matches_exclusive = pick_mutually_exclusive_matches(matches, G)
+
+		checked_subgraphs.add(subgraph_opcode_edges)
+		subgraph_to_number_of_matches[subgraph_opcode_edges] = {'full': len(matches), 'exclusive': len(matches_exclusive)}
+
+	for k, v in subgraph_to_number_of_matches.items():
+		print('%s: %d / %d' % (k, v['exclusive'], v['full']))
+	
+
+
 """Write json [ <list of matches>
 	{"template_ID" : <>,
 	 "match_idx" : 0, 1, 2, ...,
