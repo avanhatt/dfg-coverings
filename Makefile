@@ -4,6 +4,13 @@ TOP_DIR := $(realpath $(dir $(lastword $(MAKEFILE_LIST))))
 DFG_COVERINGS_DIR := $(realpath $(dir $(lastword $(MAKEFILE_LIST))))
 TEST_DIR = $(DFG_COVERINGS_DIR)/tests
 EMBENCH_DIR = $(TEST_DIR)/embench
+EMBENCH_SUPPORT_DIR = $(EMBENCH_DIR)/support
+
+EMBENCH_SUPPORT_SRC = $(EMBENCH_SUPPORT_DIR)/main.c $(EMBENCH_SUPPORT_DIR)/beebsc.c
+EMBENCH_SUPPORT_LL = $(EMBENCH_SUPPORT_SRC:.c=.ll)
+
+PROFILING_SRC = $(DFG_COVERINGS_DIR)/profiling/Profiling.c
+PROFILING_LL = $(PROFILING_SRC:.c=.ll)
 
 CFLAGS += -I $(EMBENCH_DIR)/support/ -DCPU_MHZ=1
 
@@ -11,11 +18,11 @@ CFLAGS += -I $(EMBENCH_DIR)/support/ -DCPU_MHZ=1
 
 default: pass
 
-profiling/Profiling.ll:
-	clang -S -emit-llvm profiling/Profiling.c -o $@
+%-profiling-embench: $(PROFILING_LL) $(EMBENCH_SUPPORT_LL) %-matched.ll
+	clang $^ -o $@
 
-%-profiling: %.ll profiling/Profiling.ll
-	clang  profiling/Profiling.ll $*-matched.ll -o $@
+%-profiling: $(PROFILING_LL) %-matched.ll
+	clang $^ -o $@
 
 pass:
 	cd $(BUILD_DIR); make; cd $(TOP_DIR)
@@ -24,7 +31,10 @@ clean:
 	rm -f {./tests/*,./tests/*/*,./tests/*/*/*}.{ll,json}
 	rm -f *.gv *.gv.pdf
 
-%.ll: %.c pass
+%.ll: %.c
+	clang $(CFLAGS) -S -emit-llvm $^ -o $@
+
+%-matched.ll: %.c pass
 	clang $(CFLAGS) -O1 -emit-llvm -Xclang -disable-O0-optnone -S $< -o $@
 	opt -mem2reg -inline -S $@ -o $@
-	opt -load $(BUILD_DIR)/dfg-pass/libDFGPass.* -dfg-pass -S $@ -o $*-matched.ll -json-output $*.json
+	opt -load $(BUILD_DIR)/dfg-pass/libDFGPass.* -dfg-pass -S $@ -o $@ -json-output $*.json
