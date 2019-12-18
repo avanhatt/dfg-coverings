@@ -1,5 +1,7 @@
 import json
 import argparse
+import itertools
+
 from collections import namedtuple
 from graphviz import Digraph
 import networkx as nx
@@ -9,6 +11,11 @@ Vertex = namedtuple('Vertex', ['id', 'opcode'])
 Edge = namedtuple('Edge', ['source', 'dest', 'arg_num_at_dest'])
 
 acceptable_identifiers = ['template_id', 'template_ID', 'name']
+
+class Align:
+	by_op = lambda data1, data2: data1['opcode'] == data2['opcode']
+	by_op_arity = lambda data1, data2: data1['opcode'] == data2['opcode']  and data1['arity'] == data2['arity']
+
 
 # Returns:
 #	V: list of Vertices
@@ -164,12 +171,9 @@ def is_subgraph(littleG, bigG):
 	if not (type(littleG) is nx.DiGraph): littleG = graph2nx(*littleG)
 	if not (type(bigG) is nx.DiGraph): bigG = graph2nx(*bigG)
 
-	def node_match(data1, data2):
-		return data1['opcode'] == data2['opcode'] # and data1['arity'] == data2['arity']
-
 	# Returns "if a subgraph of G1 is isomorphic to G2", so pass the
 	# (presumably larger) graph G2 first
-	gm = isomorphism.DiGraphMatcher(bigG, littleG, node_match=node_match);
+	gm = isomorphism.DiGraphMatcher(bigG, littleG, node_match=Align.by_op)
 
 	return gm.subgraph_is_isomorphic()
 
@@ -193,12 +197,9 @@ def find_matches(littleG, bigG):
 		find_matches.counter += 1
 
 
-	def node_match(data1, data2):
-		return data1['opcode'] == data2['opcode'] # and data1['arity'] == data2['arity']
-
 	matches = []
 
-	gm = isomorphism.DiGraphMatcher(bigG, littleG, node_match=node_match);
+	gm = isomorphism.DiGraphMatcher(bigG, littleG, node_match=Align.by_op)
 	for i,match in enumerate(gm.subgraph_isomorphisms_iter()):
 		matches.append( dict(
 				template_id = littleGName,
@@ -244,7 +245,7 @@ def pick_mutually_exclusive_matches(matches, G):
 	covered_nodes = set()
 	for match in matches_longest_to_shortest:
 		pointers = match['node_matches'].keys()
-		if any([p in covered_nodes for p in pointers]):
+		if any(p in covered_nodes for p in pointers):
 			continue
 		covered_nodes.update(pointers)
 		matches_exclusive.append(match)
@@ -253,9 +254,6 @@ def pick_mutually_exclusive_matches(matches, G):
 # Prints the number of times each 2-node subgraph appears in the graph
 unacceptable_subgraph_nodes = ['argument', 'constant', 'external', 'out']
 def find_two_node_matches(G):
-	def node_match(data1, data2):
-		return data1['opcode'] == data2['opcode'] # and data1['arity'] == data2['arity']
-
 	subgraph_to_number_of_matches = {}
 
 	node_pointer_to_opcode = {}
@@ -265,19 +263,19 @@ def find_two_node_matches(G):
 	for s, t, e_data in G.edges(data=True):
 		s_op = node_pointer_to_opcode[s]
 		t_op = node_pointer_to_opcode[t]
-		if any([prefix in s_op for prefix in unacceptable_subgraph_nodes]) \
-		or any([prefix in t_op for prefix in unacceptable_subgraph_nodes]):
+		if any(prefix in s_op for prefix in unacceptable_subgraph_nodes) \
+		or any(prefix in t_op for prefix in unacceptable_subgraph_nodes):
 			continue
-		
+
 		subgraph_opcode_edges = '[(%s, %s)]' % (s_op, t_op)
 		if subgraph_opcode_edges in checked_subgraphs:
 			continue
-		
+
 
 		H = G.edge_subgraph([(s, t)]).copy()
 		matches = []
 
-		gm = isomorphism.DiGraphMatcher(G, H, node_match=node_match);
+		gm = isomorphism.DiGraphMatcher(G, H, node_match=Align.by_op)
 		for i, match in enumerate(gm.subgraph_isomorphisms_iter()):
 			matches.append( dict(
 				template_id = subgraph_opcode_edges,
@@ -292,7 +290,80 @@ def find_two_node_matches(G):
 
 	for k, v in subgraph_to_number_of_matches.items():
 		print('%s: %d / %d' % (k, v['exclusive'], v['full']))
-	
+
+
+""" Used in function below """
+
+
+"""
+find subgraphs of `G` with `size` new nodes, connected to `base`.
+"""
+def find_subgraphs(G, max_size, track_search=True):
+	nodeOp = { v : v_data['opcode'] for v, v_data in G.nodes(data=True) }
+	tracking = {}
+	searched = []
+
+	def amalg(subgraph_iter):
+		for H in subgraph_iter:
+			H_name = 'GEN%d: {'% len(H) + ";".join(nodeOp[s] for s in H.nodes()) \
+				+ " | "  \
+				+ ";".join( nodeOp[s]+"->"+nodeOp[t] for (s,t) in sorted(H.edges()) ) \
+				+ "}"
+
+			gm = isomorphism.DiGraphMatcher(G, H, node_match=Align.by_op);
+
+			matches = [ dict(
+							template_id = H_name,
+							match_idx = i,
+							node_matches = match
+						)  for i, match in enumerate(gm.subgraph_isomorphisms_iter()) ]
+
+			matches_exclusive = pick_mutually_exclusive_matches(matches, G)
+			tracking[H_name] = dict(
+				graph = H,
+				n_matches = {
+					'full': len(matches),
+					'exclusive': len(matches_exclusive)
+				}
+			)
+			searched.append(H)
+			# print('%s: %d / %d' % (H_name, len(matches), len(matches_exclusive)))
+
+
+
+		# return [s for s in subgraph]
+		# TODO: sampling or exhaustive check.
+		# return [ next(iter(scores.values())) ]
+		return [ data['graph'] for data in tracking.values() ]
+
+	def extend_subgraphs(size, base=[]):
+		if size == 0: return [G.subgraph(base)]
+
+		accept = lambda n : not(n in base or any(substr in nodeOp[n] for substr in unacceptable_subgraph_nodes) )
+		candidate_nodes = [n for b in base for n in G.successors(b) if accept(n)] \
+				if len(base) > 0 else [n for n in G.nodes() if accept(n)] # covers base case where base = []
+
+		options = []
+		for n in candidate_nodes:
+			for H in extend_subgraphs(size-1, [n, *base]):
+				# checking for equality of graphs is harder than edges. We can do it with isomorphism,
+				# 'cuz these are small subgraphs. But there are a lot of isomorphism tests. We can also
+				# not check at all; this can be commented out if necessary and we'll rely more heavily on
+				# selecting exclusive subgrahps (but it will be much bigger)
+
+				if not any(isomorphism.is_isomorphic(o, H, node_match=Align.by_op) \
+					for o in itertools.chain(options, searched) ):
+						options.append(H)
+
+		# print(options)
+
+		return amalg(options)
+
+	Hs = extend_subgraphs(max_size)
+	print("Tracking %d"%len(tracking), "\tHs: %d"%len(Hs))
+	for k,v in tracking.items():
+		print('%s: %d / %d' % (k, v['n_matches']['exclusive'], v['n_matches']['full']))
+	return Hs
 
 
 """Write json [ <list of matches>
@@ -338,4 +409,5 @@ if __name__ == '__main__':
 	write_matches(matches, args.input, extra_filename='-full')
 	# save mutually exclusive matches for the LLVM pass to read
 	write_matches(matches_exclusive, args.input)
+
 	visualize_graph(G, matches_exclusive)
