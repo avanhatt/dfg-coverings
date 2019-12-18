@@ -1,9 +1,10 @@
 import json
 import argparse
-from collections import namedtuple
+from collections import namedtuple, defaultdict
 from graphviz import Digraph
 import networkx as nx
 from networkx import isomorphism
+import itertools
 
 Vertex = namedtuple('Vertex', ['id', 'opcode'])
 Edge = namedtuple('Edge', ['source', 'dest', 'arg_num_at_dest'])
@@ -233,7 +234,7 @@ def estimate_coverage(Hs, G_original) :
 '''
 Returns: list of mutually exclusive matches from all matches
 '''
-def pick_mutually_exclusive_matches(matches, G):
+def pick_mutually_exclusive_matches(matches):
 	# heuristic: sort matches by size
 	# pick matches one by one if they don't overlap any previous matches
 	# TODO: exhaustively try all combinations of subgraphs,
@@ -250,50 +251,162 @@ def pick_mutually_exclusive_matches(matches, G):
 		matches_exclusive.append(match)
 	return matches_exclusive
 
-# Prints the number of times each 2-node subgraph appears in the graph
+# Picks r stencils of up to k edges that statically cover the most instructions
 unacceptable_subgraph_nodes = ['argument', 'constant', 'external', 'out']
-def find_two_node_matches(G):
-	def node_match(data1, data2):
-		return data1['opcode'] == data2['opcode'] # and data1['arity'] == data2['arity']
-
-	subgraph_to_number_of_matches = {}
-
+def pick_r_stencils_up_to_size_k(G, k, r):
 	node_pointer_to_opcode = {}
 	for v, v_data in G.nodes(data=True):
 	 	node_pointer_to_opcode[v] = v_data['opcode']
-	checked_subgraphs = set()
-	for s, t, e_data in G.edges(data=True):
-		s_op = node_pointer_to_opcode[s]
-		t_op = node_pointer_to_opcode[t]
-		if any([prefix in s_op for prefix in unacceptable_subgraph_nodes]) \
-		or any([prefix in t_op for prefix in unacceptable_subgraph_nodes]):
-			continue
-		
-		subgraph_opcode_edges = '[(%s, %s)]' % (s_op, t_op)
-		if subgraph_opcode_edges in checked_subgraphs:
-			continue
-		
 
-		H = G.edge_subgraph([(s, t)]).copy()
+	def node_match(data1, data2):
+		return data1['opcode'] == data2['opcode'] # and data1['arity'] == data2['arity']
+
+	def has_acceptable_nodes(edge_list):
+		acceptable = []
+		for (s, t) in edge_list:
+			s_op = node_pointer_to_opcode[s]
+			t_op = node_pointer_to_opcode[t]
+			acceptable.append(not any([prefix in s_op for prefix in unacceptable_subgraph_nodes]) \
+			                  and not any([prefix in t_op for prefix in unacceptable_subgraph_nodes]))
+		return all(acceptable)
+
+
+	def canonicalize_edges(edge_list):
+		opcode_to_num = defaultdict(int)
+		pointer_to_id = {}
+		pointer_to_canonical = {}
+		canonicalized = []
+		for s, t in edge_list:
+			s_op = node_pointer_to_opcode[s]
+			s_op_num = -1
+			if s in pointer_to_id:
+				s_op_num = pointer_to_id[s]
+			else:
+				s_op_num = opcode_to_num[s_op]
+				pointer_to_id[s] = s_op_num
+				opcode_to_num[s_op] += 1
+
+			t_op = node_pointer_to_opcode[t]
+			t_op_num = -1
+			if t in pointer_to_id:
+				t_op_num = pointer_to_id[t]
+			else:
+				t_op_num = opcode_to_num[t_op]
+				pointer_to_id[t] = t_op_num
+				opcode_to_num[t_op] += 1
+			s_final = '%s_%d' % (s_op, s_op_num)
+			t_final = '%s_%d' % (t_op, t_op_num)
+			pointer_to_canonical[s] = s_final
+			pointer_to_canonical[t] = t_final
+			canonicalized.append((s_final, t_final))
+		return canonicalized, pointer_to_canonical
+
+	def edges_to_nodes(edge_list):
+		nodes = set()
+		for s, t in edge_list:
+			nodes.add(s)
+			nodes.add(t)
+		return sorted(list(nodes))
+
+	def find_k_edge_subgraph_matches(G, top_k, exactly_k_edges, current_k=1, prev_candidates=[]):
+		# generate all, including unacceptable nodes
+		candidates = [edge_list + [(s,t)] for edge_list in prev_candidates for s, t, e_data in G.edges(data=True)]
+		# first case
+		if not len(prev_candidates):
+			candidates = [[(s, t)] for s, t, e_data in G.edges(data=True)]
+		# filter out unacceptable nodes
+		candidates = [edge_list for edge_list in candidates if has_acceptable_nodes(edge_list)]
+		# keep only connected subgraphs with k edges
+		Hs = [G.edge_subgraph(edge_list) for edge_list in candidates]
+		connected = [nx.is_connected(H.to_undirected()) for H in Hs]
+		num_edges = [len(H.edges()) for H in Hs]
+		final_edge_lists = [edge_list for edge_list, con, num in zip(candidates, connected, num_edges) if con and num == current_k]
+		final_Hs = [H for H, con, num in zip(Hs, connected, num_edges) if con and num == current_k]
+
+		# remove duplicates
+		ALL_EDGES = set()
+		final_final_edge_lists = []
+		final_final_Hs = []
+		for edge_list, H in zip(final_edge_lists, final_Hs):
+			alphabetized = tuple(sorted(['%s_%s' % (s, t) for s, t in edge_list]))
+			if alphabetized not in ALL_EDGES:
+				ALL_EDGES.add(alphabetized)
+				final_final_edge_lists.append(edge_list)
+				final_final_Hs.append(H)
+		final_edge_lists = final_final_edge_lists
+		final_Hs = final_final_Hs
+
+		# compare all current_k-edge subgraphs to each other to find matches
+		H_ops = set()
+		final_final_edge_lists = []
+		final_final_Hs = []
+		canonical_H_to_num = defaultdict(int)
+		canonical_H_to_matches = defaultdict(list)
 		matches = []
+		for H_1 in final_Hs:
+			found = False
+			for canonical_H in canonical_H_to_num.keys():
+				gm = isomorphism.DiGraphMatcher(H_1, canonical_H, node_match=node_match);
+				if gm.subgraph_is_isomorphic():
+					mapping = next(gm.isomorphisms_iter())
+					canonical_edges, pointer_to_canonical = canonicalize_edges(canonical_H.edges())
+					mapping = {v1: pointer_to_canonical[v2] for v1, v2 in mapping.items()}
+					match = dict(
+						template_id = canonical_edges,
+						match_idx = canonical_H_to_num[canonical_H],
+						node_matches = mapping
+					)
+					matches.append(match)
+					canonical_H_to_matches[tuple(canonical_edges)].append(match)
+					found = True
+					canonical_H_to_num[canonical_H] += 1
+					break
+			if not found:
+				canonical_edges, pointer_to_canonical = canonicalize_edges(H_1.edges())
+				mapping = {v: pointer_to_canonical[v] for v in H_1.nodes()}
+				match = dict(
+					template_id = canonical_edges,
+					match_idx = canonical_H_to_num[H_1],
+					node_matches = mapping
+				)
+				matches.append(match)
+				canonical_H_to_matches[tuple(canonical_edges)].append(match)
+				canonical_H_to_num[H_1] += 1
 
-		gm = isomorphism.DiGraphMatcher(G, H, node_match=node_match);
-		for i, match in enumerate(gm.subgraph_isomorphisms_iter()):
-			matches.append( dict(
-				template_id = subgraph_opcode_edges,
-				match_idx = i,
-				node_matches = match
-			))
+		subgraph_to_number_of_matches = {}
+		for edge_list, H_matches in canonical_H_to_matches.items():
+			distinct_edges = set()
+			exclusive_matches = pick_mutually_exclusive_matches(H_matches)
+			subgraph_to_number_of_matches[edge_list] = \
+			  {'full': len(H_matches), 'exclusive': len(exclusive_matches)}
 
-		matches_exclusive = pick_mutually_exclusive_matches(matches, G)
-
-		checked_subgraphs.add(subgraph_opcode_edges)
-		subgraph_to_number_of_matches[subgraph_opcode_edges] = {'full': len(matches), 'exclusive': len(matches_exclusive)}
-
+		if current_k < top_k:
+			if exactly_k_edges:
+				return find_k_edge_subgraph_matches(G, top_k, exactly_k_edges, current_k+1, final_edge_lists)
+			next_k_matches, next_H_to_matches, next_k_counts = find_k_edge_subgraph_matches(G, top_k, exactly_k_edges, current_k+1, final_edge_lists)
+			matches.extend(next_k_matches)
+			canonical_H_to_matches.update(next_H_to_matches)
+			subgraph_to_number_of_matches.update(next_k_counts)
+		return matches, canonical_H_to_matches, subgraph_to_number_of_matches
+	
+	matches, subgraph_to_matches, subgraph_to_number_of_matches = find_k_edge_subgraph_matches(G, k, exactly_k_edges=False)
+	
+	# print the stencils, number of mutually exclusive matches, total number of matches
 	for k, v in subgraph_to_number_of_matches.items():
 		print('%s: %d / %d' % (k, v['exclusive'], v['full']))
-	
 
+	# pick collection of up to r subgraph stencils
+	best_combo = None
+	best_matches = []
+	for combo in itertools.combinations(subgraph_to_matches.keys(), r):
+		stencil_matches = [match for subgraph in combo for match in subgraph_to_matches[subgraph]]
+		exclusive_matches = pick_mutually_exclusive_matches(stencil_matches)
+		if len(exclusive_matches) > len(best_matches):
+			best_combo = combo
+			best_matches = exclusive_matches
+	print(combo, len(best_matches))
+	
+	return best_matches
 
 """Write json [ <list of matches>
 	{"template_ID" : <>,
@@ -333,9 +446,12 @@ if __name__ == '__main__':
 	for H in Hs:
 		matches.extend(find_matches(H, G))
 
-	matches_exclusive = pick_mutually_exclusive_matches(matches, G)
+	matches_exclusive = pick_mutually_exclusive_matches(matches)
 	# save all matches (which might overlap)
 	write_matches(matches, args.input, extra_filename='-full')
 	# save mutually exclusive matches for the LLVM pass to read
 	write_matches(matches_exclusive, args.input)
 	visualize_graph(G, matches_exclusive)
+
+	matches = pick_r_stencils_up_to_size_k(G, k=3, r=2)
+
