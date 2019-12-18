@@ -298,13 +298,21 @@ def find_two_node_matches(G):
 """
 find subgraphs of `G` with `size` new nodes, connected to `base`.
 """
-def find_subgraphs(G, max_size, track_search=True):
-	nodeOp = { v : v_data['opcode'] for v, v_data in G.nodes(data=True) }
+def find_subgraphs(G_orig, max_size, track_search=True):
+	nodeOp = { v : v_data['opcode'] for v, v_data in G_orig.nodes(data=True) }
+	accept = lambda n : not( any(substr in nodeOp[n] for substr in unacceptable_subgraph_nodes) )
+
+	G = G_orig.subgraph([n for n in G_orig if accept(n)])
+
 	tracking = {}
 	searched = []
 
-	def amalg(subgraph_iter):
-		for H in subgraph_iter:
+	def amalg(subgraphs):
+
+		for H in subgraphs:
+			if any(isomorphism.is_isomorphic(s, H, node_match=Align.by_op) for s in searched):
+				 continue
+
 			H_name = 'GEN%d: {'% len(H) + ";".join(nodeOp[s] for s in H.nodes()) \
 				+ " | "  \
 				+ ";".join( nodeOp[s]+"->"+nodeOp[t] for (s,t) in sorted(H.edges()) ) \
@@ -327,21 +335,17 @@ def find_subgraphs(G, max_size, track_search=True):
 				}
 			)
 			searched.append(H)
-			# print('%s: %d / %d' % (H_name, len(matches), len(matches_exclusive)))
-
-
 
 		# return [s for s in subgraph]
 		# TODO: sampling or exhaustive check.
 		# return [ next(iter(scores.values())) ]
-		return [ data['graph'] for data in tracking.values() ]
+		return subgraphs
 
 	def extend_subgraphs(size, base=[]):
 		if size == 0: return [G.subgraph(base)]
 
-		accept = lambda n : not(n in base or any(substr in nodeOp[n] for substr in unacceptable_subgraph_nodes) )
-		candidate_nodes = [n for b in base for n in G.successors(b) if accept(n)] \
-				if len(base) > 0 else [n for n in G.nodes() if accept(n)] # covers base case where base = []
+		candidate_nodes = [n for b in base for n in G.successors(b) if not(n in base)] \
+				if len(base) > 0 else G.nodes() # covers base case where base = []
 
 		options = []
 		for n in candidate_nodes:
@@ -351,16 +355,13 @@ def find_subgraphs(G, max_size, track_search=True):
 				# not check at all; this can be commented out if necessary and we'll rely more heavily on
 				# selecting exclusive subgrahps (but it will be much bigger)
 
-				if not any(isomorphism.is_isomorphic(o, H, node_match=Align.by_op) \
-					for o in itertools.chain(options, searched) ):
-						options.append(H)
-
-		# print(options)
+				if not any(isomorphism.is_isomorphic(o, H, node_match=Align.by_op) for o in options):
+					options.append(H)
 
 		return amalg(options)
 
-	Hs = extend_subgraphs(max_size)
-	print("Tracking %d"%len(tracking), "\tHs: %d"%len(Hs))
+	finalHs = extend_subgraphs(max_size)
+	print("Tracking %d"%len(tracking), "\tfinalHs: %d"%len(finalHs))
 	for k,v in tracking.items():
 		print('%s: %d / %d' % (k, v['n_matches']['exclusive'], v['n_matches']['full']))
 	return Hs
