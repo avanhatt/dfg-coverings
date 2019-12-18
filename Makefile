@@ -11,11 +11,11 @@ CFLAGS += -I $(EMBENCH_DIR)/support/ -DCPU_MHZ=1
 
 default: pass
 
-profiling:
-	clang -S -emit-llvm dfg-pass/Profiling.cpp
+profiling/Profiling.ll:
+	clang -S -emit-llvm profiling/Profiling.c -o $@
 
-%-profiling: %.ll
-	clang  Profiling.ll $*-matched.ll -o $@
+%-profiling: %.ll profiling/Profiling.ll
+	clang  profiling/Profiling.ll $*-matched.ll -o $@
 
 pass:
 	cd $(BUILD_DIR); make; cd $(TOP_DIR)

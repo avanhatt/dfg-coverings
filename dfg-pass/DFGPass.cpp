@@ -57,6 +57,8 @@ namespace {
     json DestinationToOperands;
     int TotalInstructions = 0;
     int InstructionsMatched = 0;
+    Function *Increment;
+
     DFGPass() : ModulePass(ID) { }
 
     ~DFGPass() {}
@@ -195,7 +197,7 @@ namespace {
       auto IntType = Type::getInt32Ty(M->getContext());
       auto IncrementType = FunctionType::get(VoidType, {IntType, IntType},
         /*isVarArg*/false);
-      Function::Create(IncrementType, Function::ExternalLinkage,
+      Increment = Function::Create(IncrementType, Function::ExternalLinkage,
         "incremementCounts", M);
 
       auto PrintDynamicType = FunctionType::get(VoidType, {},
@@ -333,7 +335,16 @@ namespace {
 
         // If instrumenting profiling, increment counters
         if (Profiling) {
+          int BlockTotalInstructions = distance(B.begin(), B.end());
 
+          llvm::Type *IntTy = IntegerType::getInt32Ty(F.getContext());
+          llvm::Constant *Matched = ConstantInt::get(IntTy,
+            BlockMatchedInstructions, false);
+          llvm::Constant *Total = ConstantInt::get(IntTy,
+            BlockTotalInstructions, false);
+
+          Instruction *Term = B.getTerminator();
+          auto Call = CallInst::Create(Increment, {Matched, Total}, "", Term);
         }
       }
     }
