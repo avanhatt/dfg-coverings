@@ -275,7 +275,7 @@ def pick_r_stencils_up_to_size_k(G, k, r, filename):
 		return all(acceptable)
 
 
-	def canonicalize_edges(edge_list):
+	def canonicalize_name(edge_list, node_list):
 		opcode_to_num = defaultdict(int)
 		pointer_to_id = {}
 		pointer_to_canonical = {}
@@ -293,8 +293,10 @@ def pick_r_stencils_up_to_size_k(G, k, r, filename):
 			pointer_to_canonical[s] = s_final
 			return s_final
 		canonicalized = sorted([('(%s, %s)' % (pointer_to_string(s), pointer_to_string(t))) for s, t in edge_list])
-		canonical_string = ', '.join(canonicalized)
-		return canonical_string, pointer_to_canonical
+		canonical_edges = ', '.join(canonicalized)
+		canonical_nodes = ', '.join(sorted([pointer_to_canonical[v] for v in node_list]))
+		H_name = '%s | %s' % (canonical_nodes, canonical_edges) 
+		return H_name, pointer_to_canonical
 
 	def edges_to_nodes(edge_list):
 		nodes = set()
@@ -340,9 +342,7 @@ def pick_r_stencils_up_to_size_k(G, k, r, filename):
 				gm = isomorphism.DiGraphMatcher(H_1, canonical_H, node_match=node_match);
 				if gm.subgraph_is_isomorphic():
 					mapping = next(gm.isomorphisms_iter())
-					canonical_edges, pointer_to_canonical = canonicalize_edges(canonical_H.edges())
-					canonical_nodes = ', '.join(sorted([pointer_to_canonical[v] for v in canonical_H.nodes()]))
-					H_name = '%s | %s' % (canonical_nodes, canonical_edges) 
+					H_name, pointer_to_canonical = canonicalize_name(canonical_H.edges(), canonical_H.nodes())
 					mapping = {v1: pointer_to_canonical[v2] for v1, v2 in mapping.items()}
 					match = dict(
 						template_id = H_name,
@@ -355,9 +355,7 @@ def pick_r_stencils_up_to_size_k(G, k, r, filename):
 					canonical_H_to_num[canonical_H] += 1
 					break
 			if not found:
-				canonical_edges, pointer_to_canonical = canonicalize_edges(H_1.edges())
-				canonical_nodes = ', '.join(sorted([pointer_to_canonical[v] for v in H_1.nodes()]))
-				H_name = '%s | %s' % (canonical_nodes, canonical_edges) 
+				H_name, pointer_to_canonical = canonicalize_name(H_1.edges(), H_1.nodes())
 				mapping = {v: pointer_to_canonical[v] for v in H_1.nodes()}
 				match = dict(
 					template_id = H_name,
@@ -456,7 +454,7 @@ if __name__ == '__main__':
 
 	# this finds candidate stencils within a dfg
 	# instead of relying on the hand-specified chains
-	matches = pick_r_stencils_up_to_size_k(G, k=2, r=2, filename=args.input)
+	matches = pick_r_stencils_up_to_size_k(G, k=3, r=2, filename=args.input)
 	write_matches(matches, args.input)
 	visualize_graph(G, matches)
 
