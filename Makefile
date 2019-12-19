@@ -26,7 +26,7 @@ pass:
 	cd $(BUILD_DIR); make; cd $(TOP_DIR)
 
 clean:
-	rm -rf *.{ll,json,gv,gv.pdf,o}
+	rm -f {*,*/*,*/*/*}/*.{ll,json,gv,gv.pdf,o,csv}
 
 %.ll: %.c
 	clang $(CFLAGS) -S -emit-llvm $^ -o $@

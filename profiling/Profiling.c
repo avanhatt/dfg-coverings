@@ -6,22 +6,37 @@
 #endif
 
 // Global count variables, atomic to support multithreaded code
-_Atomic long MatchedInstructions = 0;
-_Atomic long TotalInstructions = 0;
+_Atomic long DynamicMatched = 0;
+_Atomic long DynamicTotal = 0;
+
+_Atomic long StaticMatched = 0;
+_Atomic long StaticTotal = 0;
+
+// To be called once, on module begin
+void saveStaticCounts(int Matched, int Total) {
+  StaticMatched = Matched;
+  StaticTotal = Total;
+}
 
 // To be called per basic block
 void incremementCounts(int Matched, int Total) {
-  MatchedInstructions += Matched;
-  TotalInstructions += Total;
+  DynamicMatched += Matched;
+  DynamicTotal += Total;
 }
 
 // To be called once, on module end
 void printDynamicProfiling() {
-  float Percent = (float)MatchedInstructions/TotalInstructions*100;
+  float StaticPercent = (float)StaticMatched/StaticTotal*100;
+  printf("%ld/%ld (%.2f %%) static instructions matched\n",
+    StaticMatched,
+    StaticTotal,
+    StaticPercent);
+
+  float DynamicPercent = (float)DynamicMatched/DynamicTotal*100;
   printf("%ld/%ld (%.2f %%) dynamic instructions matched\n",
-    MatchedInstructions,
-    TotalInstructions,
-    Percent);
+    DynamicMatched,
+    DynamicTotal,
+    DynamicPercent);
 
   // Write out profiling results to a csv
   FILE *f = fopen(FILENAME, "w");
@@ -30,12 +45,17 @@ void printDynamicProfiling() {
       exit(1);
   }
 
-  fprintf(f, "matched,total,percent\n");
+  fprintf(f, "static matched,static total,static percent\n");
+  fprintf(f, "dynamic matched,dynamic total,dynamic percent,");
 
-  fprintf(f, "%ld,%ld,%f\n",
-    MatchedInstructions,
-    TotalInstructions,
-    Percent);
+  fprintf(f, "%ld,%ld,%f,%ld,%ld,%f\n",
+    StaticMatched,
+    StaticTotal,
+    StaticPercent,
+    DynamicMatched,
+    DynamicTotal,
+    DynamicPercent
+    );
 
   fclose(f);
 }
