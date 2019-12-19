@@ -125,7 +125,7 @@ def has_side_effects(opcode):
 	return any([o in opcode for o in opcodes])
 
 
-def visualize_graph(G, matches=None):
+def visualize_graph(G, matches=None, highlight=[]):
 	if not (type(G) is nx.DiGraph): G = graph2nx(*G)
 
 	dot = Digraph()
@@ -157,6 +157,10 @@ def visualize_graph(G, matches=None):
 				dot.attr('node', shape='oval', style='filled', color='red')
 			else:
 				dot.attr('node', shape='oval', style='solid', color='black')
+
+		if vertex.id in highlight:
+			dot.attr('node', style='filled', color='red')
+			
 		dot.node(vertex.id, vertex.opcode)
 	for e in edge_gen:
 		dot.edge(*e)
@@ -364,7 +368,7 @@ def find_subgraphs(G_orig, max_size, track_search=True):
 	print("Tracking %d"%len(tracking), "\tfinalHs: %d"%len(finalHs))
 	for k,v in tracking.items():
 		print('%s: %d / %d' % (k, v['n_matches']['exclusive'], v['n_matches']['full']))
-	return Hs
+	return finalHs
 
 
 """Write json [ <list of matches>
