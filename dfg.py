@@ -133,9 +133,13 @@ def visualize_graph(G, matches=None):
 
 	for n in node_gen:
 		vertex = Vertex(*n)
+
 		# Hacky, should fix at some point
 		if has_side_effects(vertex.opcode):
-			dot.attr('node', shape='diamond', style='filled', color='pink')
+			if vertex.id in pointer_matches:
+				dot.attr('node', shape='diamond', style='filled', color='red')
+			else:
+				dot.attr('node', shape='diamond', style='filled', color='pink')
 		elif "external" in vertex.opcode or "argument" in vertex.opcode:
 			dot.attr('node', shape='diamond', style='filled',
 				color='lightgreen')
@@ -301,6 +305,9 @@ def pick_r_stencils_up_to_size_k(G, k, r):
 			canonicalized.append((s_final, t_final))
 		return canonicalized, pointer_to_canonical
 
+	def canonical_string(canonicalized):
+		return ' '.join(sorted(['(%s, %s)' % (s, t) for s, t in canonicalized]))
+
 	def edges_to_nodes(edge_list):
 		nodes = set()
 		for s, t in edge_list:
@@ -352,7 +359,7 @@ def pick_r_stencils_up_to_size_k(G, k, r):
 					canonical_edges, pointer_to_canonical = canonicalize_edges(canonical_H.edges())
 					mapping = {v1: pointer_to_canonical[v2] for v1, v2 in mapping.items()}
 					match = dict(
-						template_id = canonical_edges,
+						template_id = canonical_string(canonical_edges),
 						match_idx = canonical_H_to_num[canonical_H],
 						node_matches = mapping
 					)
@@ -365,7 +372,7 @@ def pick_r_stencils_up_to_size_k(G, k, r):
 				canonical_edges, pointer_to_canonical = canonicalize_edges(H_1.edges())
 				mapping = {v: pointer_to_canonical[v] for v in H_1.nodes()}
 				match = dict(
-					template_id = canonical_edges,
+					template_id = canonical_string(canonical_edges),
 					match_idx = canonical_H_to_num[H_1],
 					node_matches = mapping
 				)
@@ -389,7 +396,7 @@ def pick_r_stencils_up_to_size_k(G, k, r):
 			subgraph_to_number_of_matches.update(next_k_counts)
 		return matches, canonical_H_to_matches, subgraph_to_number_of_matches
 	
-	matches, subgraph_to_matches, subgraph_to_number_of_matches = find_k_edge_subgraph_matches(G, k, exactly_k_edges=False)
+	matches, subgraph_to_matches, subgraph_to_number_of_matches = find_k_edge_subgraph_matches(G, k, exactly_k_edges=True)
 	
 	# print the stencils, number of mutually exclusive matches, total number of matches
 	for k, v in subgraph_to_number_of_matches.items():
@@ -404,7 +411,7 @@ def pick_r_stencils_up_to_size_k(G, k, r):
 		if len(exclusive_matches) > len(best_matches):
 			best_combo = combo
 			best_matches = exclusive_matches
-	print(combo, len(best_matches))
+	print(best_combo, len(best_matches))
 	
 	return best_matches
 
@@ -426,7 +433,6 @@ if __name__ == '__main__':
 
 	G = graph2nx(*graph_from_json(args.input))
 	# print_graph(V, E)
-	visualize_graph(G)
 
 	chains = [
 		["mul", "add", "srem"],
@@ -446,12 +452,14 @@ if __name__ == '__main__':
 	for H in Hs:
 		matches.extend(find_matches(H, G))
 
-	matches_exclusive = pick_mutually_exclusive_matches(matches)
-	# save all matches (which might overlap)
-	write_matches(matches, args.input, extra_filename='-full')
-	# save mutually exclusive matches for the LLVM pass to read
-	write_matches(matches_exclusive, args.input)
-	visualize_graph(G, matches_exclusive)
+	# matches_exclusive = pick_mutually_exclusive_matches(matches)
+	# # save all matches (which might overlap)
+	# write_matches(matches, args.input, extra_filename='-full')
+	# # save mutually exclusive matches for the LLVM pass to read
+	# write_matches(matches_exclusive, args.input)
+	# visualize_graph(G, matches_exclusive)
 
 	matches = pick_r_stencils_up_to_size_k(G, k=3, r=2)
+	write_matches(matches, args.input)
+	visualize_graph(G, matches)
 
