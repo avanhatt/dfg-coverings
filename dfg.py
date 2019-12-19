@@ -5,6 +5,7 @@ from graphviz import Digraph
 import networkx as nx
 from networkx import isomorphism
 import itertools
+import time
 
 Vertex = namedtuple('Vertex', ['id', 'opcode'])
 Edge = namedtuple('Edge', ['source', 'dest', 'arg_num_at_dest'])
@@ -383,8 +384,11 @@ def pick_r_stencils_up_to_size_k(G, k, r, filename):
 			subgraph_to_number_of_matches.update(next_k_counts)
 		return matches, canonical_H_to_matches, subgraph_to_number_of_matches
 	
+	t1 = time.time()
 	matches, subgraph_to_matches, subgraph_to_number_of_matches = find_k_edge_subgraph_matches(G, k, exactly_k_edges=True)
-	
+	t2 = time.time()
+	print('Seconds: %.4f' % (t2 - t1))
+
 	# print the stencils, number of mutually exclusive matches, total number of matches
 	filename = filename.replace(".json", "-matches_%d-edge-subgraphs.json" % k, 1)
 	with open(filename, "w") as file:
@@ -454,7 +458,7 @@ if __name__ == '__main__':
 
 	# this finds candidate stencils within a dfg
 	# instead of relying on the hand-specified chains
-	matches = pick_r_stencils_up_to_size_k(G, k=3, r=2, filename=args.input)
+	matches = pick_r_stencils_up_to_size_k(G, k=4, r=2, filename=args.input)
 	write_matches(matches, args.input)
 	visualize_graph(G, matches)
 
