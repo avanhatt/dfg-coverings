@@ -257,7 +257,7 @@ def pick_mutually_exclusive_matches(matches):
 
 # Picks r stencils of up to k edges that statically cover the most instructions
 unacceptable_subgraph_nodes = ['argument', 'constant', 'external', 'out']
-def pick_r_stencils_up_to_size_k(G, k, r):
+def pick_r_stencils_up_to_size_k(G, k, r, filename):
 	node_pointer_to_opcode = {}
 	for v, v_data in G.nodes(data=True):
 	 	node_pointer_to_opcode[v] = v_data['opcode']
@@ -303,10 +303,8 @@ def pick_r_stencils_up_to_size_k(G, k, r):
 			pointer_to_canonical[s] = s_final
 			pointer_to_canonical[t] = t_final
 			canonicalized.append((s_final, t_final))
-		return canonicalized, pointer_to_canonical
-
-	def canonical_string(canonicalized):
-		return ' '.join(sorted(['(%s, %s)' % (s, t) for s, t in canonicalized]))
+		canonical_string = ' '.join(sorted(['(%s, %s)' % (s, t) for s, t in canonicalized]))
+		return canonical_string, pointer_to_canonical
 
 	def edges_to_nodes(edge_list):
 		nodes = set()
@@ -327,26 +325,22 @@ def pick_r_stencils_up_to_size_k(G, k, r):
 		Hs = [G.edge_subgraph(edge_list) for edge_list in candidates]
 		connected = [nx.is_connected(H.to_undirected()) for H in Hs]
 		num_edges = [len(H.edges()) for H in Hs]
-		final_edge_lists = [edge_list for edge_list, con, num in zip(candidates, connected, num_edges) if con and num == current_k]
-		final_Hs = [H for H, con, num in zip(Hs, connected, num_edges) if con and num == current_k]
+		edge_lists = [edge_list for edge_list, con, num in zip(candidates, connected, num_edges) if con and num == current_k]
+		Hs = [H for H, con, num in zip(Hs, connected, num_edges) if con and num == current_k]
 
 		# remove duplicates
-		ALL_EDGES = set()
-		final_final_edge_lists = []
-		final_final_Hs = []
-		for edge_list, H in zip(final_edge_lists, final_Hs):
+		edges_without_duplicates = set()
+		final_edge_lists = []
+		final_Hs = []
+		for edge_list, H in zip(edge_lists, Hs):
 			alphabetized = tuple(sorted(['%s_%s' % (s, t) for s, t in edge_list]))
-			if alphabetized not in ALL_EDGES:
-				ALL_EDGES.add(alphabetized)
-				final_final_edge_lists.append(edge_list)
-				final_final_Hs.append(H)
-		final_edge_lists = final_final_edge_lists
-		final_Hs = final_final_Hs
+			if alphabetized not in edges_without_duplicates:
+				edges_without_duplicates.add(alphabetized)
+				final_edge_lists.append(edge_list)
+				final_Hs.append(H)
 
 		# compare all current_k-edge subgraphs to each other to find matches
 		H_ops = set()
-		final_final_edge_lists = []
-		final_final_Hs = []
 		canonical_H_to_num = defaultdict(int)
 		canonical_H_to_matches = defaultdict(list)
 		matches = []
@@ -359,12 +353,12 @@ def pick_r_stencils_up_to_size_k(G, k, r):
 					canonical_edges, pointer_to_canonical = canonicalize_edges(canonical_H.edges())
 					mapping = {v1: pointer_to_canonical[v2] for v1, v2 in mapping.items()}
 					match = dict(
-						template_id = canonical_string(canonical_edges),
+						template_id = canonical_edges,
 						match_idx = canonical_H_to_num[canonical_H],
 						node_matches = mapping
 					)
 					matches.append(match)
-					canonical_H_to_matches[tuple(canonical_edges)].append(match)
+					canonical_H_to_matches[canonical_edges].append(match)
 					found = True
 					canonical_H_to_num[canonical_H] += 1
 					break
@@ -372,24 +366,25 @@ def pick_r_stencils_up_to_size_k(G, k, r):
 				canonical_edges, pointer_to_canonical = canonicalize_edges(H_1.edges())
 				mapping = {v: pointer_to_canonical[v] for v in H_1.nodes()}
 				match = dict(
-					template_id = canonical_string(canonical_edges),
+					template_id = canonical_edges,
 					match_idx = canonical_H_to_num[H_1],
 					node_matches = mapping
 				)
 				matches.append(match)
-				canonical_H_to_matches[tuple(canonical_edges)].append(match)
+				canonical_H_to_matches[canonical_edges].append(match)
 				canonical_H_to_num[H_1] += 1
 
 		subgraph_to_number_of_matches = {}
 		for edge_list, H_matches in canonical_H_to_matches.items():
-			distinct_edges = set()
 			exclusive_matches = pick_mutually_exclusive_matches(H_matches)
 			subgraph_to_number_of_matches[edge_list] = \
 			  {'full': len(H_matches), 'exclusive': len(exclusive_matches)}
 
 		if current_k < top_k:
 			if exactly_k_edges:
+				# return only the final top_k-edge subgraphs, not the smaller ones
 				return find_k_edge_subgraph_matches(G, top_k, exactly_k_edges, current_k+1, final_edge_lists)
+			# otherwise keep track of all the smaller subgraphs, too
 			next_k_matches, next_H_to_matches, next_k_counts = find_k_edge_subgraph_matches(G, top_k, exactly_k_edges, current_k+1, final_edge_lists)
 			matches.extend(next_k_matches)
 			canonical_H_to_matches.update(next_H_to_matches)
@@ -399,8 +394,9 @@ def pick_r_stencils_up_to_size_k(G, k, r):
 	matches, subgraph_to_matches, subgraph_to_number_of_matches = find_k_edge_subgraph_matches(G, k, exactly_k_edges=True)
 	
 	# print the stencils, number of mutually exclusive matches, total number of matches
-	for k, v in subgraph_to_number_of_matches.items():
-		print('%s: %d / %d' % (k, v['exclusive'], v['full']))
+	filename = filename.replace(".json", "-matches_%d-edge-subgraphs.json" % k, 1)
+	with open(filename, "w") as file:
+		file.write(json.dumps(subgraph_to_number_of_matches, indent=4))
 
 	# pick collection of up to r subgraph stencils
 	best_combo = None
@@ -411,7 +407,10 @@ def pick_r_stencils_up_to_size_k(G, k, r):
 		if len(exclusive_matches) > len(best_matches):
 			best_combo = combo
 			best_matches = exclusive_matches
-	print(best_combo, len(best_matches))
+	print('Best stencils:')
+	for combo in best_combo:
+		print('\t', combo)
+	print("Number of times stencils matched: %d" % len(best_matches))
 	
 	return best_matches
 
@@ -452,14 +451,16 @@ if __name__ == '__main__':
 	for H in Hs:
 		matches.extend(find_matches(H, G))
 
-	# matches_exclusive = pick_mutually_exclusive_matches(matches)
-	# # save all matches (which might overlap)
-	# write_matches(matches, args.input, extra_filename='-full')
-	# # save mutually exclusive matches for the LLVM pass to read
-	# write_matches(matches_exclusive, args.input)
-	# visualize_graph(G, matches_exclusive)
+	matches_exclusive = pick_mutually_exclusive_matches(matches)
+	# save all matches (which might overlap)
+	write_matches(matches, args.input, extra_filename='-full')
+	# save mutually exclusive matches for the LLVM pass to read
+	write_matches(matches_exclusive, args.input)
+	visualize_graph(G, matches_exclusive)
 
-	matches = pick_r_stencils_up_to_size_k(G, k=3, r=2)
+	# this finds candidate stencils within a dfg
+	# instead of relying on the hand-specified chains
+	matches = pick_r_stencils_up_to_size_k(G, k=3, r=2, filename=args.input)
 	write_matches(matches, args.input)
 	visualize_graph(G, matches)
 
