@@ -18,18 +18,15 @@ CFLAGS += -I $(EMBENCH_DIR)/support/ -DCPU_MHZ=1
 
 default: pass
 
-%-profiling-embench: $(PROFILING_LL) $(EMBENCH_SUPPORT_LL) %-matched.ll
-	clang $^ -o $@
-
-%-profiling: $(PROFILING_LL) %-matched.ll
-	clang $^ -o $@
+%-profiling.o: $(SUPPORT_LL) %-matched.ll
+	clang $(CFLAGS) -DFILENAME='"$*-profiling.csv"' -S -emit-llvm $(PROFILING_SRC) -o $(PROFILING_LL)
+	clang $(PROFILING_LL) $^ -o $@
 
 pass:
 	cd $(BUILD_DIR); make; cd $(TOP_DIR)
 
 clean:
-	rm -f {./tests/*,./tests/*/*,./tests/*/*/*}.{ll,json}
-	rm -f *.gv *.gv.pdf
+	rm -rf *.{ll,json,gv,gv.pdf,o}
 
 %.ll: %.c
 	clang $(CFLAGS) -S -emit-llvm $^ -o $@

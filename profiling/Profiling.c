@@ -1,4 +1,9 @@
 #include <stdio.h>
+#include <stdlib.h>
+
+#ifndef FILENAME
+#define FILENAME "profiling.csv"
+#endif
 
 // Global count variables, atomic to support multithreaded code
 _Atomic long MatchedInstructions = 0;
@@ -12,8 +17,25 @@ void incremementCounts(int Matched, int Total) {
 
 // To be called once, on module end
 void printDynamicProfiling() {
-    printf("%ld/%ld (%.2f %%) dynamic instructions matched\n",
-       MatchedInstructions,
+  float Percent = (float)MatchedInstructions/TotalInstructions*100;
+  printf("%ld/%ld (%.2f %%) dynamic instructions matched\n",
+    MatchedInstructions,
     TotalInstructions,
-    (float)MatchedInstructions/TotalInstructions*100);
+    Percent);
+
+  // Write out profiling results to a csv
+  FILE *f = fopen(FILENAME, "w");
+  if (f == NULL) {
+      printf("Error opening file!\n");
+      exit(1);
+  }
+
+  fprintf(f, "matched,total,percent\n");
+
+  fprintf(f, "%ld,%ld,%f\n",
+    MatchedInstructions,
+    TotalInstructions,
+    Percent);
+
+  fclose(f);
 }
