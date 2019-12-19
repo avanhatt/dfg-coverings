@@ -160,7 +160,7 @@ def visualize_graph(G, matches=None, highlight=[]):
 
 		if vertex.id in highlight:
 			dot.attr('node', style='filled', color='red')
-			
+
 		dot.node(vertex.id, vertex.opcode)
 	for e in edge_gen:
 		dot.edge(*e)
@@ -348,8 +348,8 @@ def find_subgraphs(G_orig, max_size, track_search=True):
 	def extend_subgraphs(size, base=[]):
 		if size == 0: return [G.subgraph(base)]
 
-		candidate_nodes = [n for b in base for n in G.successors(b) if not(n in base)] \
-				if len(base) > 0 else G.nodes() # covers base case where base = []
+		candidate_nodes = [n for b in base for n in itertools.chain(G.successors(b), G.predecessors(b)) \
+			if not(n in base)] if len(base) > 0 else G.nodes() # covers base case where base = []
 
 		options = []
 		for n in candidate_nodes:
