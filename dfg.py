@@ -6,6 +6,7 @@ import networkx as nx
 from networkx import isomorphism
 import itertools
 import time
+import csv
 
 Vertex = namedtuple('Vertex', ['id', 'opcode'])
 Edge = namedtuple('Edge', ['source', 'dest', 'arg_num_at_dest'])
@@ -256,9 +257,34 @@ def pick_mutually_exclusive_matches(matches):
 		matches_exclusive.append(match)
 	return matches_exclusive
 
+# pick collection of up to r subgraph stencils
+def pick_r_stencils(subgraph_to_matches, r, filename):
+	best_matches = []
+	best_combo_with_counts = None
+	for combo in itertools.combinations(subgraph_to_matches.keys(), r):
+		stencil_matches = [match for subgraph in combo for match in subgraph_to_matches[subgraph]]
+		exclusive_matches = pick_mutually_exclusive_matches(stencil_matches)
+		if len(exclusive_matches) > len(best_matches):
+			best_matches = exclusive_matches
+			best_combo_with_counts = defaultdict(int)
+			for match in exclusive_matches:
+				best_combo_with_counts[match['template_id']] += 1
+	# save best combo in csv
+	with open(filename, "w") as csvfile:
+		csvwriter = csv.writer(csvfile, delimiter='\t')
+		csvwriter.writerow(['subgraph', 'exclusive'])
+		for stencil, count in sorted(best_combo_with_counts.items()):
+			csvwriter.writerow([stencil, count])
+	# and print for ease
+	print('Best stencil combination:')
+	for stencil, count in best_combo_with_counts.items():
+		print('\t%s: %d' % (stencil, count))
+	print("Total number of times stencils matched: %d" % len(best_matches))
+	return best_matches
+
 # Picks r stencils of up to k edges that statically cover the most instructions
 unacceptable_subgraph_nodes = ['argument', 'constant', 'external', 'out']
-def pick_r_stencils_up_to_size_k(G, k, r, filename):
+def generate_all_stencils_between_ks(G, bottom_k, top_k, filename):
 	node_pointer_to_opcode = {}
 	for v, v_data in G.nodes(data=True):
 	 	node_pointer_to_opcode[v] = v_data['opcode']
@@ -306,8 +332,21 @@ def pick_r_stencils_up_to_size_k(G, k, r, filename):
 			nodes.add(t)
 		return sorted(list(nodes))
 
-	def find_k_edge_subgraph_matches(G, top_k, exactly_k_edges, current_k=1, prev_candidates=[]):
-		# generate all, including unacceptable nodes
+	def H_to_name_and_match(H, match_idx, mapping=None):
+		H_name, pointer_to_canonical = canonicalize_name(H.edges(), H.nodes())
+		if mapping == None:
+			mapping = {v: pointer_to_canonical[v] for v in H.nodes()}
+		else:
+			mapping = {v1: pointer_to_canonical[v2] for v1, v2 in mapping.items()}
+		match = dict(
+			template_id = H_name,
+			match_idx = match_idx,
+			node_matches = mapping
+		)
+		return H_name, match
+
+	def find_k_edge_subgraph_matches(G, bottom_k, top_k, current_k=1, prev_candidates=[]):
+		# generate all k-edge subgraphs, including those unacceptable nodes
 		candidates = [edge_list + [(s,t)] for edge_list in prev_candidates for s, t, e_data in G.edges(data=True)]
 		# first case
 		if not len(prev_candidates):
@@ -336,81 +375,59 @@ def pick_r_stencils_up_to_size_k(G, k, r, filename):
 		H_ops = set()
 		canonical_H_to_num = defaultdict(int)
 		canonical_H_to_matches = defaultdict(list)
-		matches = []
-		for H_1 in final_Hs:
+		for current_H in final_Hs:
 			found = False
 			for canonical_H in canonical_H_to_num.keys():
-				gm = isomorphism.DiGraphMatcher(H_1, canonical_H, node_match=node_match);
+				gm = isomorphism.DiGraphMatcher(current_H, canonical_H, node_match=node_match);
 				if gm.subgraph_is_isomorphic():
 					mapping = next(gm.isomorphisms_iter())
-					H_name, pointer_to_canonical = canonicalize_name(canonical_H.edges(), canonical_H.nodes())
-					mapping = {v1: pointer_to_canonical[v2] for v1, v2 in mapping.items()}
-					match = dict(
-						template_id = H_name,
-						match_idx = canonical_H_to_num[canonical_H],
-						node_matches = mapping
-					)
-					matches.append(match)
+					H_name, match = H_to_name_and_match(canonical_H, canonical_H_to_num[canonical_H], mapping)
 					canonical_H_to_matches[H_name].append(match)
 					found = True
 					canonical_H_to_num[canonical_H] += 1
 					break
 			if not found:
-				H_name, pointer_to_canonical = canonicalize_name(H_1.edges(), H_1.nodes())
-				mapping = {v: pointer_to_canonical[v] for v in H_1.nodes()}
-				match = dict(
-					template_id = H_name,
-					match_idx = canonical_H_to_num[H_1],
-					node_matches = mapping
-				)
-				matches.append(match)
+				H_name, match = H_to_name_and_match(current_H, canonical_H_to_num[current_H])
 				canonical_H_to_matches[H_name].append(match)
-				canonical_H_to_num[H_1] += 1
+				canonical_H_to_num[current_H] += 1
 
 		subgraph_to_number_of_matches = {}
 		for edge_list, H_matches in canonical_H_to_matches.items():
 			exclusive_matches = pick_mutually_exclusive_matches(H_matches)
 			subgraph_to_number_of_matches[edge_list] = \
-			  {'full': len(H_matches), 'exclusive': len(exclusive_matches)}
+			  {'total': len(H_matches), 'exclusive': len(exclusive_matches)}
 
 		if current_k < top_k:
-			if exactly_k_edges:
-				# return only the final top_k-edge subgraphs, not the smaller ones
-				return find_k_edge_subgraph_matches(G, top_k, exactly_k_edges, current_k+1, final_edge_lists)
-			# otherwise keep track of all the smaller subgraphs, too
-			next_k_matches, next_H_to_matches, next_k_counts = find_k_edge_subgraph_matches(G, top_k, exactly_k_edges, current_k+1, final_edge_lists)
-			matches.extend(next_k_matches)
+			if current_k < bottom_k:
+				# don't return these intermediate subgraphs
+				return find_k_edge_subgraph_matches(G, bottom_k, top_k, current_k+1, final_edge_lists)
+			# otherwise keep track of all these smaller subgraphs, too
+			next_H_to_matches, next_k_counts = find_k_edge_subgraph_matches(G, bottom_k, top_k, current_k+1, final_edge_lists)
 			canonical_H_to_matches.update(next_H_to_matches)
 			subgraph_to_number_of_matches.update(next_k_counts)
-		return matches, canonical_H_to_matches, subgraph_to_number_of_matches
+		return canonical_H_to_matches, subgraph_to_number_of_matches
 	
 	t1 = time.time()
-	matches, subgraph_to_matches, subgraph_to_number_of_matches = find_k_edge_subgraph_matches(G, k, exactly_k_edges=True)
+	subgraph_to_matches, subgraph_to_number_of_matches = find_k_edge_subgraph_matches(G, bottom_k, top_k)
 	t2 = time.time()
 	print('Seconds: %.4f' % (t2 - t1))
 
-	# print the stencils, number of mutually exclusive matches, total number of matches
-	filename = filename.replace(".json", "-matches_%d-edge-subgraphs.json" % k, 1)
-	with open(filename, "w") as file:
+	# save the stencils, number of mutually exclusive matches, total number of matches
+	# as both human-readable csv and json for possible later use
+	with open(filename.replace(".json", "-matches_(%d-to-%d)-edge-subgraphs.csv" % (bottom_k, top_k), 1), "w") as csvfile:
+		csvwriter = csv.writer(csvfile, delimiter='\t')
+		csvwriter.writerow(['subgraph', 'exclusive', 'total'])
+		for k, v in sorted(subgraph_to_number_of_matches.items()):
+			csvwriter.writerow([k, v['exclusive'], v['total']])
+	with open(filename.replace(".json", "-matches_(%d-to-%d)-edge-subgraphs.json" % (bottom_k, top_k), 1), "w") as file:
 		file.write(json.dumps(subgraph_to_number_of_matches, indent=4))
-	for k, v in sorted(subgraph_to_number_of_matches.items()):
-		print(k)
+	# and print number of stencils found
+	if bottom_k == top_k:
+		print('Total stencils with %d edges: %d' % (top_k, len(subgraph_to_matches)))
+	else:
+		print('Total stencils with between %d and %d edges: %d' % (bottom_k, top_k, len(subgraph_to_matches)))
 
-	# pick collection of up to r subgraph stencils
-	best_combo = None
-	best_matches = []
-	for combo in itertools.combinations(subgraph_to_matches.keys(), r):
-		stencil_matches = [match for subgraph in combo for match in subgraph_to_matches[subgraph]]
-		exclusive_matches = pick_mutually_exclusive_matches(stencil_matches)
-		if len(exclusive_matches) > len(best_matches):
-			best_combo = combo
-			best_matches = exclusive_matches
-	print('Best stencils:')
-	for combo in best_combo:
-		print('\t', combo)
-	print("Number of times stencils matched: %d" % len(best_matches))
-	
-	return best_matches
+	return subgraph_to_matches
 
 """Write json [ <list of matches>
 	{"template_ID" : <>,
@@ -458,7 +475,10 @@ if __name__ == '__main__':
 
 	# this finds candidate stencils within a dfg
 	# instead of relying on the hand-specified chains
-	matches = pick_r_stencils_up_to_size_k(G, k=4, r=2, filename=args.input)
-	write_matches(matches, args.input)
-	visualize_graph(G, matches)
+	bottom_k = 3
+	top_k = 3
+	subgraph_to_matches = generate_all_stencils_between_ks(G, bottom_k=bottom_k, top_k=top_k, filename=args.input)
+	best_combo_matches = pick_r_stencils(subgraph_to_matches, r=2, filename=args.input.replace(".json", "-matches_(%d-to-%d)-edge-subgraphs_combos.csv" % (bottom_k, top_k), 1))
+	write_matches(best_combo_matches, args.input)
+	visualize_graph(G, best_combo_matches)
 
