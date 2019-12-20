@@ -33,7 +33,18 @@ def run_embench_benchmark(benchmark):
     # Run the executable
     subprocess.call([target])
 
+    print(target[:-5] + ".csv")
+    with open(target[:-5] + ".csv", "r") as csv_file:
+        with open("embench-profiling.csv", "a") as f:
+            for l in csv_file:
+                pass
+
+            f.write(f_root + "," + l)
+
 def profile_embench():
+
+    with open("embench-profiling.csv", "w") as f:
+        f.write("benchmark,static matched,static total,static percent,dynamic matched,dynamic total,dynamic percent\n")
 
     contents = [os.path.join(EMBENCH_DIR, v) for v in os.listdir(EMBENCH_DIR)]
     benchmarks = [v for v in contents if os.path.isdir(v) and "support" not in v]
