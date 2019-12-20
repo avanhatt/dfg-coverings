@@ -17,6 +17,12 @@ Additional dependencies are (for OSX):
 
 ## Testing and usage
 
+First, build the LLVM pass with:
+
+    mkdir build
+    cd build; cmake ..; cd ..
+    make pass
+
 To find common subgraphs in a single source file and generate dynamic profiling
 results, run:
 
