@@ -2,6 +2,7 @@
 #include "llvm/Analysis/IVUsers.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/LegacyPassManager.h"
+#include "llvm/IR/IRBuilder.h"
 #include "llvm/Pass.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/FormatVariadic.h"
@@ -58,6 +59,8 @@ namespace {
     int TotalInstructions = 0;
     int InstructionsMatched = 0;
     Function *Increment;
+    Function *SaveStatic;
+    Function *SaveStaticWrapper;
 
     DFGPass() : ModulePass(ID) { }
 
@@ -189,22 +192,43 @@ namespace {
         (float)InstructionsMatched/TotalInstructions);
       errs() << S;
 
+      if (Profiling) {
+         passStaticProfiling(M, InstructionsMatched, TotalInstructions);
+      }
+
       return true;
     }
 
     void declareProfilingFunctions(Module *M) {
       auto VoidType = Type::getVoidTy(M->getContext());
+      auto VoidFunType = FunctionType::get(VoidType, {}, /*isVarArg*/false);
       auto IntType = Type::getInt32Ty(M->getContext());
-      auto IncrementType = FunctionType::get(VoidType, {IntType, IntType},
+      auto FunType = FunctionType::get(VoidType, {IntType, IntType},
         /*isVarArg*/false);
-      Increment = Function::Create(IncrementType, Function::ExternalLinkage,
+      Increment = Function::Create(FunType, Function::ExternalLinkage,
         "incremementCounts", M);
 
-      auto PrintDynamicType = FunctionType::get(VoidType, {},
-        /*isVarArg*/false);
-      auto PrintDynamic = Function::Create(PrintDynamicType,
+      // To save static types, wrap the function with args with one without args
+      SaveStatic = Function::Create(FunType, Function::ExternalLinkage,
+       "saveStaticCounts", M);
+      SaveStaticWrapper = Function::Create(VoidFunType,
+        Function::ExternalLinkage, "saveStaticCountsWrapper", M);
+      appendToGlobalCtors(*M, SaveStaticWrapper, /*Priority*/0);
+
+      auto PrintDynamic = Function::Create(VoidFunType,
         Function::ExternalLinkage, "printDynamicProfiling", M);
       appendToGlobalDtors(*M, PrintDynamic, /*Priority*/0);
+    }
+
+    void passStaticProfiling(Module &M, int Matched, int Total) {
+      BasicBlock *Entry = BasicBlock::Create(M.getContext(), "entry",
+        SaveStaticWrapper);
+      IRBuilder<> builder(Entry);
+      Type *IntTy = IntegerType::getInt32Ty(M.getContext());
+      Constant *MatchedArg = ConstantInt::get(IntTy, Matched, false);
+      Constant *TotalArg = ConstantInt::get(IntTy, Total, false);
+      builder.CreateCall(SaveStatic, {MatchedArg, TotalArg});
+      builder.CreateRet(nullptr);
     }
 
     void writeOutJsonDFG() {
@@ -337,11 +361,11 @@ namespace {
         if (Profiling) {
           int BlockTotalInstructions = distance(B.begin(), B.end());
 
-          llvm::Type *IntTy = IntegerType::getInt32Ty(F.getContext());
-          llvm::Constant *Matched = ConstantInt::get(IntTy,
-            BlockMatchedInstructions, false);
-          llvm::Constant *Total = ConstantInt::get(IntTy,
-            BlockTotalInstructions, false);
+          Type *IntTy = IntegerType::getInt32Ty(F.getContext());
+          Constant *Matched = ConstantInt::get(IntTy, BlockMatchedInstructions,
+            false);
+          Constant *Total = ConstantInt::get(IntTy, BlockTotalInstructions,
+            false);
 
           Instruction *Term = B.getTerminator();
           auto Call = CallInst::Create(Increment, {Matched, Total}, "", Term);
