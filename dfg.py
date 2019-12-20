@@ -276,6 +276,12 @@ def pick_r_stencils(subgraph_to_matches, r, filename):
 		csvwriter.writerow(['subgraph', 'exclusive'])
 		for stencil, count in sorted(best_combo_with_counts.items()):
 			csvwriter.writerow([stencil, count])
+	# save best combo stencil jsons for matching to other programs
+	stencil_jsons = []
+	for stencil_canonical_string in best_combo_with_counts.keys():
+		stencil_jsons.append(subgraph_to_matches[stencil_canonical_string][0]['template_json'])
+	with open(filename.replace(".csv", "-stencils.json", 1), "w") as file:
+		file.write(json.dumps(list(stencil_jsons), indent=4))
 	# and print for ease
 	print('Best stencil combination:')
 	for stencil, count in best_combo_with_counts.items():
@@ -326,6 +332,16 @@ def generate_all_stencils_between_ks(G, bottom_k, top_k, filename):
 		H_name = '%s | %s' % (canonical_nodes, canonical_edges) 
 		return H_name, pointer_to_canonical
 
+	def canonicalize_json(H, pointer_to_canonical):
+		H_renamed = H.copy()
+		for v in H.nodes():
+			H_renamed.nodes[v]['id'] = pointer_to_canonical[v]
+		for e in H.edges():
+			H_renamed.edges[e]['source'] = pointer_to_canonical[H_renamed.edges[e]['source']]
+			H_renamed.edges[e]['dest'] = pointer_to_canonical[H_renamed.edges[e]['dest']]
+		H_renamed = nx.relabel_nodes(H_renamed, {v: pointer_to_canonical[v] for v in H_renamed.nodes()})
+		return nx.readwrite.json_graph.node_link_data(H_renamed)
+		
 	def edges_to_nodes(edge_list):
 		nodes = set()
 		for s, t in edge_list:
@@ -339,8 +355,10 @@ def generate_all_stencils_between_ks(G, bottom_k, top_k, filename):
 			mapping = {v: pointer_to_canonical[v] for v in H.nodes()}
 		else:
 			mapping = {v1: pointer_to_canonical[v2] for v1, v2 in mapping.items()}
+		H_json = canonicalize_json(H, pointer_to_canonical)
 		match = dict(
 			template_id = H_name,
+			template_json = H_json,
 			match_idx = match_idx,
 			node_matches = mapping
 		)
@@ -373,7 +391,6 @@ def generate_all_stencils_between_ks(G, bottom_k, top_k, filename):
 				final_Hs.append(H)
 
 		# compare all current_k-edge subgraphs to each other to find matches
-		H_ops = set()
 		canonical_H_to_num = defaultdict(int)
 		canonical_H_to_matches = defaultdict(list)
 		for current_H in final_Hs:
@@ -444,6 +461,7 @@ def write_matches(matches, filename, extra_filename=''):
 if __name__ == '__main__':
 	parser = argparse.ArgumentParser()
 	parser.add_argument('--input', type=str, required=True)
+	#parser.add_argument('--stencils', type=str, required=True)
 	args = parser.parse_args();
 
 	G = graph2nx(*graph_from_json(args.input))
