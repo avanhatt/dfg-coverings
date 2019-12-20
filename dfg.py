@@ -12,6 +12,8 @@ Vertex = namedtuple('Vertex', ['id', 'opcode'])
 Edge = namedtuple('Edge', ['source', 'dest', 'arg_num_at_dest'])
 
 acceptable_identifiers = ['template_id', 'template_ID', 'name']
+opcodes_with_side_effects = ["ret", "br", "call", "out", "store", "load"]
+unacceptable_subgraph_nodes = ['argument', 'constant', 'external'] + opcodes_with_side_effects
 
 # Returns:
 #	V: list of Vertices
@@ -115,10 +117,8 @@ def print_graph(G):
 	else:
 		print("Graph format not recognized")
 
-
 def has_side_effects(opcode):
-	opcodes = ["ret", "br", "call", "out", "store"]
-	return any([o in opcode for o in opcodes])
+	return any([o in opcode for o in opcodes_with_side_effects])
 
 
 def visualize_graph(G, matches=None):
@@ -290,7 +290,6 @@ def pick_r_stencils(subgraph_to_matches, r, filename):
 	return best_matches
 
 # generate all stencils with numbers of edges between bottom_k and top_k
-unacceptable_subgraph_nodes = ['argument', 'constant', 'external', 'out']
 def generate_all_stencils_between_ks(G, bottom_k, top_k, filename):
 	node_pointer_to_opcode = {}
 	for v, v_data in G.nodes(data=True):
