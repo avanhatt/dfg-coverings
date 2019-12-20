@@ -2,7 +2,6 @@ import os
 import subprocess
 
 EMBENCH_DIR = 'tests/embench/'
-EMBENCH_SUPPORT = EMBENCH_DIR + '/support'
 
 def run_embench_benchmark(benchmark):
 
@@ -12,6 +11,8 @@ def run_embench_benchmark(benchmark):
         if ext == '.c':
             c_files.append(f_root)
 
+    # Benchmarks with multiple files need to be combined into one IR file before
+    # running our pass
     if len(c_files) > 1:
         ll_files = []
         for file in c_files:
@@ -32,11 +33,21 @@ def run_embench_benchmark(benchmark):
     # Run the executable
     subprocess.call([target])
 
+    print(target[:-5] + ".csv")
+    with open(target[:-5] + ".csv", "r") as csv_file:
+        with open("embench-profiling.csv", "a") as f:
+            for l in csv_file:
+                pass
+
+            f.write(f_root + "," + l)
+
 def profile_embench():
 
-    contents = [os.path.join(EMBENCH_DIR, v) for v in os.listdir(EMBENCH_DIR)]
-    benchmarks = [v for v in contents if os.path.isdir(v) and v != EMBENCH_SUPPORT]
+    with open("embench-profiling.csv", "w") as f:
+        f.write("benchmark,static matched,static total,static percent,dynamic matched,dynamic total,dynamic percent\n")
 
+    contents = [os.path.join(EMBENCH_DIR, v) for v in os.listdir(EMBENCH_DIR)]
+    benchmarks = [v for v in contents if os.path.isdir(v) and "support" not in v]
     for benchmark in benchmarks:
         run_embench_benchmark(benchmark)
 
