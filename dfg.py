@@ -121,7 +121,7 @@ def has_side_effects(opcode):
 	return any([o in opcode for o in opcodes_with_side_effects])
 
 
-def visualize_graph(G, matches=None):
+def visualize_graph(G, matches=None, filename='output.gv'):
 	if not (type(G) is nx.DiGraph): G = graph2nx(*G)
 
 	dot = Digraph()
@@ -162,7 +162,7 @@ def visualize_graph(G, matches=None):
 		dot.edge(*e)
 
 	try:
-		dot.render('output.gv', view=True)
+		dot.render(filename, view=True)
 	except Exception as e:
 		print("viewer error", e)
 
@@ -507,7 +507,7 @@ if __name__ == '__main__':
 	bottom_k = 2
 	top_k = 2
 	subgraph_to_matches = generate_all_stencils_between_ks(G, bottom_k=bottom_k, top_k=top_k, filename=args.input)
-	best_combo_matches = pick_r_stencils(subgraph_to_matches, r=2, filename=args.input.replace(".json", "-matches_%d-to-%d-edge-subgraphs_combos.csv" % (bottom_k, top_k), 1))
+	best_combo_matches = pick_r_stencils(subgraph_to_matches, r=2, filename=args.input.replace(".json", "_%d-to-%d-edge-subgraphs_combos.csv" % (bottom_k, top_k), 1))
 	write_matches(best_combo_matches, args.input)
-	visualize_graph(G, best_combo_matches)
+	visualize_graph(G, best_combo_matches, filename=args.input.replace(".json", "_%d-to-%d-edge-subgraphs_combos.gv" % (bottom_k, top_k), 1))
 
