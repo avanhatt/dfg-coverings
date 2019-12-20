@@ -3,6 +3,28 @@ import subprocess
 
 EMBENCH_DIR = 'tests/embench/'
 
+BY_SIZE = [
+            "cubic/",
+            "st/",
+            "crc32/",
+            "ud/",
+            "matmult-int/",
+            "nbody/",
+            "minver/",
+            "sglib-combined/",
+            "aha-mont64/",
+            "edn/",
+            "nettle-sha256/",
+            "huffbench/",
+            "slre/",
+            "qrduino/",
+            "wikisort/",
+            "nettle-aes/",
+            "statemate/",
+            "picojpeg/",
+            "nsichneu/",
+            ]
+
 def run_embench_benchmark(benchmark):
 
     c_files = []
@@ -46,8 +68,9 @@ def profile_embench():
     with open("embench-profiling.csv", "w") as f:
         f.write("benchmark,static matched,static total,static percent,dynamic matched,dynamic total,dynamic percent\n")
 
-    contents = [os.path.join(EMBENCH_DIR, v) for v in os.listdir(EMBENCH_DIR)]
-    benchmarks = [v for v in contents if os.path.isdir(v) and "support" not in v]
+    # contents = [os.path.join(EMBENCH_DIR, v) for v in os.listdir(EMBENCH_DIR)]
+    # benchmarks = [v for v in contents if os.path.isdir(v) and "support" not in v]
+    benchmarks = [os.path.join(EMBENCH_DIR, v) for v in BY_SIZE]
     for benchmark in benchmarks:
         run_embench_benchmark(benchmark)
 
