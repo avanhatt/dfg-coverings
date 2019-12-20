@@ -447,6 +447,7 @@ def generate_all_stencils_between_ks(G, bottom_k, top_k, filename):
 
 	return subgraph_to_matches
 
+
 """Write json [ <list of matches>
 	{"template_ID" : <>,
 	 "match_idx" : 0, 1, 2, ...,
@@ -458,10 +459,11 @@ def write_matches(matches, filename, extra_filename=''):
 	with open(filename, "w") as file:
 		file.write(json.dumps(matches, indent=4))
 
+# if no --stencil-json argument, then the default is to generate stencils
 if __name__ == '__main__':
 	parser = argparse.ArgumentParser()
 	parser.add_argument('--input', type=str, required=True)
-	parser.add_argument('--stencil_json', type=str, required=False)
+	parser.add_argument('--stencil-json', type=str, required=False)
 	args = parser.parse_args();
 
 	G = graph2nx(*graph_from_json(args.input))
@@ -476,11 +478,13 @@ if __name__ == '__main__':
 
 	Hs = [ graph2nx(*construct_chain(l), name= "[" + ", ".join(l) + "]") for l in chains ]
 
+	extra_filename = ''
 	if args.stencil_json:
 		with open(args.stencil_json, 'r') as jsonfile:
 			Hs = []
 			for H_json in json.load(jsonfile):
 				Hs.append(nx.readwrite.json_graph.node_link_graph(H_json))
+		extra_filename = '_' + (args.stencil_json.split('/')[-1]).replace('.json', '', 1)
 
 	# For colored printing
 	g = "\033[92m"
@@ -493,10 +497,11 @@ if __name__ == '__main__':
 
 	matches_exclusive = pick_mutually_exclusive_matches(matches)
 	# save all matches (which might overlap)
-	write_matches(matches, args.input, extra_filename='-full')
-	# save mutually exclusive matches for the LLVM pass to read
+	write_matches(matches, args.input, extra_filename='%s-full' % (extra_filename))
 	write_matches(matches_exclusive, args.input)
-	visualize_graph(G, matches_exclusive)
+	
+	if args.stencil_json:
+		exit()
 
 	# this finds candidate stencils within a dfg
 	# instead of relying on the hand-specified chains

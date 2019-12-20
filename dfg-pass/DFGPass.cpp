@@ -25,14 +25,21 @@ using namespace std;
 
 namespace {
 
-  // -info is a command line argument to opt
+  // -json-output is a command line argument to opt
   static cl::opt<string> OutputFilename(
     "json-output", // Name of command line arg
     cl::desc("Specify the filename to write the graph to"), // -help text
     cl::init("info.json") // Default value
   );
 
-    // -blocks is a command line argument to opt
+  // -stencil-json is a command line argument to opt
+  static cl::opt<string> StencilJsonFilename(
+    "stencil-json", // Name of command line arg
+    cl::desc("Specify the filename from which to read subgraph stencils"), // -help text
+    cl::init("") // Default value
+  );
+
+  // -blocks is a command line argument to opt
   static cl::opt<bool> PerBasicBlock(
     "blocks", // Name of command line arg
     cl::desc("Specify whether to output subgraphs per basic block"), // -help
@@ -176,6 +183,9 @@ namespace {
       //string
       string CallPython = "python3 dfg.py " + (string)(IsInteractive ? "-i " : "")
         + "--input " + OutputFilename;
+      if (!StencilJsonFilename.empty()) {
+        CallPython += " --stencil-json " + StencilJsonFilename;
+      }
       system(CallPython.c_str());
 
       json MatchesJson = readInJsonMatches();

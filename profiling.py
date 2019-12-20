@@ -1,5 +1,15 @@
 import os
 import subprocess
+import argparse
+
+parser = argparse.ArgumentParser()
+parser.add_argument('--stencil-json', type=str, required=False)
+args = parser.parse_args();
+additional_flags = ''
+csv_filename = 'embench-profiling.csv'
+if args.stencil_json:
+    additional_flags = 'ADD_PASS_FLAGS=-stencil-json %s' % args.stencil_json
+    csv_filename = 'embench-profiling_%s.csv' % (args.stencil_json.split('/')[-1]).replace('.json', '', 1)
 
 EMBENCH_DIR = 'tests/embench/'
 
@@ -26,12 +36,13 @@ BY_SIZE = [
             ]
 
 def run_embench_benchmark(benchmark):
-
     c_files = []
     for filename in os.listdir(benchmark):
         f_root, ext = os.path.splitext(filename)
         if ext == '.c':
             c_files.append(f_root)
+
+     
 
     # Benchmarks with multiple files need to be combined into one IR file before
     # running our pass
@@ -40,7 +51,10 @@ def run_embench_benchmark(benchmark):
         for file in c_files:
             f_target = os.path.join(benchmark, file + '.ll')
             ll_files.append(f_target)
-            subprocess.call(['make', f_target])
+            make_command = ['make', f_target]
+            if additional_flags:
+                make_command.append(additional_flags)
+            subprocess.call(make_command)
 
         comb_target = os.path.join(benchmark, 'combined.ll')
         subprocess.call(['llvm-link'] + ll_files + ["-S", "-o", comb_target])
@@ -50,22 +64,24 @@ def run_embench_benchmark(benchmark):
         target = os.path.join(benchmark, c_files[0] + '-profiling-em.o')
 
     # Run make
-    subprocess.call(['make', target])
+    make_command = ['make', target]
+    if additional_flags:
+        make_command.append(additional_flags)
+    subprocess.call(make_command)
 
     # Run the executable
     subprocess.call([target])
 
     print(target[:-5] + ".csv")
     with open(target[:-5] + ".csv", "r") as csv_file:
-        with open("embench-profiling.csv", "a") as f:
+        with open(csv_filename, "a") as f:
             for l in csv_file:
                 pass
 
-            f.write(f_root + "," + l)
+            f.write(benchmark.split('/')[-2] + "," + l)
 
 def profile_embench():
-
-    with open("embench-profiling.csv", "w") as f:
+    with open(csv_filename, "w") as f:
         f.write("benchmark,static matched,static total,static percent,dynamic matched,dynamic total,dynamic percent\n")
 
     # contents = [os.path.join(EMBENCH_DIR, v) for v in os.listdir(EMBENCH_DIR)]
