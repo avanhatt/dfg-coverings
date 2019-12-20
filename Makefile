@@ -18,7 +18,11 @@ CFLAGS += -I $(EMBENCH_DIR)/support/ -DCPU_MHZ=1
 
 default: pass
 
-%-profiling.o: $(SUPPORT_LL) %-matched.ll
+%-profiling-em.o: $(EMBENCH_SUPPORT_LL) %-matched.ll
+	clang $(CFLAGS) -DFILENAME='"$*-profiling.csv"' -S -emit-llvm $(PROFILING_SRC) -o $(PROFILING_LL)
+	clang $(PROFILING_LL) $^ -o $@
+
+%-profiling.o: %-matched.ll
 	clang $(CFLAGS) -DFILENAME='"$*-profiling.csv"' -S -emit-llvm $(PROFILING_SRC) -o $(PROFILING_LL)
 	clang $(PROFILING_LL) $^ -o $@
 
@@ -32,6 +36,11 @@ clean:
 	clang $(CFLAGS) -S -emit-llvm $^ -o $@
 
 %-matched.ll: %.c pass
+	clang $(CFLAGS) -O1 -emit-llvm -Xclang -disable-O0-optnone -S $< -o $@
+	opt -mem2reg -inline -S $@ -o $@
+	opt -load $(BUILD_DIR)/dfg-pass/libDFGPass.* -dfg-pass -S $@ -o $@ -json-output $*.json
+
+%-matched.ll: %.ll pass
 	clang $(CFLAGS) -O1 -emit-llvm -Xclang -disable-O0-optnone -S $< -o $@
 	opt -mem2reg -inline -S $@ -o $@
 	opt -load $(BUILD_DIR)/dfg-pass/libDFGPass.* -dfg-pass -S $@ -o $@ -json-output $*.json

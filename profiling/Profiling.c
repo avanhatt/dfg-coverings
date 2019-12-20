@@ -45,8 +45,8 @@ void printDynamicProfiling() {
       exit(1);
   }
 
-  fprintf(f, "static matched,static total,static percent\n");
-  fprintf(f, "dynamic matched,dynamic total,dynamic percent,");
+  fprintf(f, "static matched,static total,static percent,");
+  fprintf(f, "dynamic matched,dynamic total,dynamic percent\n");
 
   fprintf(f, "%ld,%ld,%f,%ld,%ld,%f\n",
     StaticMatched,
