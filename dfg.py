@@ -257,7 +257,8 @@ def pick_mutually_exclusive_matches(matches):
 		matches_exclusive.append(match)
 	return matches_exclusive
 
-# pick collection of up to r subgraph stencils
+# pick collection exactly r subgraph stencils
+# that statically covers the most instructions
 def pick_r_stencils(subgraph_to_matches, r, filename):
 	best_matches = []
 	best_combo_with_counts = None
@@ -282,7 +283,7 @@ def pick_r_stencils(subgraph_to_matches, r, filename):
 	print("Total number of times stencils matched: %d" % len(best_matches))
 	return best_matches
 
-# Picks r stencils of up to k edges that statically cover the most instructions
+# generate all stencils with numbers of edges between bottom_k and top_k
 unacceptable_subgraph_nodes = ['argument', 'constant', 'external', 'out']
 def generate_all_stencils_between_ks(G, bottom_k, top_k, filename):
 	node_pointer_to_opcode = {}
