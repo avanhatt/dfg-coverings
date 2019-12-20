@@ -432,12 +432,12 @@ def generate_all_stencils_between_ks(G, bottom_k, top_k, filename):
 
 	# save the stencils, number of mutually exclusive matches, total number of matches
 	# as both human-readable csv and json for possible later use
-	with open(filename.replace(".json", "-matches_(%d-to-%d)-edge-subgraphs.csv" % (bottom_k, top_k), 1), "w") as csvfile:
+	with open(filename.replace(".json", "-matches_%d-to-%d-edge-subgraphs.csv" % (bottom_k, top_k), 1), "w") as csvfile:
 		csvwriter = csv.writer(csvfile, delimiter='\t')
 		csvwriter.writerow(['subgraph', 'exclusive', 'total'])
 		for k, v in sorted(subgraph_to_number_of_matches.items()):
 			csvwriter.writerow([k, v['exclusive'], v['total']])
-	with open(filename.replace(".json", "-matches_(%d-to-%d)-edge-subgraphs.json" % (bottom_k, top_k), 1), "w") as file:
+	with open(filename.replace(".json", "-matches_%d-to-%d-edge-subgraphs.json" % (bottom_k, top_k), 1), "w") as file:
 		file.write(json.dumps(subgraph_to_number_of_matches, indent=4))
 	# and print number of stencils found
 	if bottom_k == top_k:
@@ -461,7 +461,7 @@ def write_matches(matches, filename, extra_filename=''):
 if __name__ == '__main__':
 	parser = argparse.ArgumentParser()
 	parser.add_argument('--input', type=str, required=True)
-	#parser.add_argument('--stencils', type=str, required=True)
+	parser.add_argument('--stencil_json', type=str, required=False)
 	args = parser.parse_args();
 
 	G = graph2nx(*graph_from_json(args.input))
@@ -475,6 +475,12 @@ if __name__ == '__main__':
 	]
 
 	Hs = [ graph2nx(*construct_chain(l), name= "[" + ", ".join(l) + "]") for l in chains ]
+
+	if args.stencil_json:
+		with open(args.stencil_json, 'r') as jsonfile:
+			Hs = []
+			for H_json in json.load(jsonfile):
+				Hs.append(nx.readwrite.json_graph.node_link_graph(H_json))
 
 	# For colored printing
 	g = "\033[92m"
@@ -494,10 +500,10 @@ if __name__ == '__main__':
 
 	# this finds candidate stencils within a dfg
 	# instead of relying on the hand-specified chains
-	bottom_k = 3
-	top_k = 3
+	bottom_k = 2
+	top_k = 2
 	subgraph_to_matches = generate_all_stencils_between_ks(G, bottom_k=bottom_k, top_k=top_k, filename=args.input)
-	best_combo_matches = pick_r_stencils(subgraph_to_matches, r=2, filename=args.input.replace(".json", "-matches_(%d-to-%d)-edge-subgraphs_combos.csv" % (bottom_k, top_k), 1))
+	best_combo_matches = pick_r_stencils(subgraph_to_matches, r=2, filename=args.input.replace(".json", "-matches_%d-to-%d-edge-subgraphs_combos.csv" % (bottom_k, top_k), 1))
 	write_matches(best_combo_matches, args.input)
 	visualize_graph(G, best_combo_matches)
 
