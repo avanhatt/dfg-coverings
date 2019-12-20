@@ -12,7 +12,7 @@ EMBENCH_SUPPORT_LL = $(EMBENCH_SUPPORT_SRC:.c=.ll)
 PROFILING_SRC = $(DFG_COVERINGS_DIR)/profiling/Profiling.c
 PROFILING_LL = $(PROFILING_SRC:.c=.ll)
 
-CFLAGS += -I $(EMBENCH_DIR)/support/ -DCPU_MHZ=1
+CFLAGS += -I $(EMBENCH_DIR)/support/ -DCPU_MHZ=1 -O1
 
 .PHONY: pass clean
 
@@ -36,11 +36,11 @@ clean:
 	clang $(CFLAGS) -S -emit-llvm $^ -o $@
 
 %-matched.ll: %.c pass
-	clang $(CFLAGS) -O1 -emit-llvm -Xclang -disable-O0-optnone -S $< -o $@
+	clang $(CFLAGS) -emit-llvm -Xclang -disable-O0-optnone -S $< -o $@
 	opt -mem2reg -inline -S $@ -o $@
 	opt -load $(BUILD_DIR)/dfg-pass/libDFGPass.* -dfg-pass $(ADD_PASS_FLAGS) -S $@ -o $@ -json-output $*.json
 
 %-matched.ll: %.ll pass
-	clang $(CFLAGS) -O1 -emit-llvm -Xclang -disable-O0-optnone -S $< -o $@
+	clang $(CFLAGS) -emit-llvm -Xclang -disable-O0-optnone -S $< -o $@
 	opt -mem2reg -inline -S $@ -o $@
 	opt -load $(BUILD_DIR)/dfg-pass/libDFGPass.* -dfg-pass $(ADD_PASS_FLAGS) -S $@ -o $@ -json-output $*.json
