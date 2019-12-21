@@ -1,14 +1,43 @@
-# dfg-coverings
-Data flow graph coverings
+# Finding redundancies in data flow graph
 
-Dependencies:
+This project uses [LLVM][] to find redundant subgraphs in programs' static data
+flow graphs. The high level motivation and details are described [here][TODO].
 
+[llvm]: https://llvm.org
+
+## Dependencies
+
+We require C++17, LLVM 8, and Python 3.
+
+Additional dependencies are (for OSX):
+
+    brew install graphviz
     pip install graphviz
+    pip install networkx
 
-Generate stencils for each embench benchmark:
+## Testing and usage
 
-	python profiling.py
+First, build the LLVM pass with:
 
-Check coverage of specific stencils in `<stencil_file>` for each embench benchmark:
+    mkdir build
+    cd build; cmake ..; cd ..
+    make pass
 
-	python profiling.py --stencil_json <stencil_file>
+To find common subgraphs in a single source file and generate dynamic profiling
+results, run:
+
+    make <filename base>-profiling.o
+    <filename base>-profiling.o
+
+We use the [Embench] embedded profiling benchmark suite.
+
+To generate subgraph stencils for each Embench benchmark:
+
+	python3 profiling.py
+
+To check coverage of specific stencils in `<stencil_file>` for each Embench
+benchmark:
+
+	python3 profiling.py --stencil_json <stencil_file>
+
+[embench]: https://embench.org
