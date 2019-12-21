@@ -40,4 +40,8 @@ benchmark:
 
 	python3 profiling.py --stencil_json <stencil_file>
 
+To generate evaluation graphs (after generating stencils for Embench benchmarks):
+	
+	python3 graph.py
+
 [embench]: https://embench.org
